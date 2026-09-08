@@ -1,0 +1,28 @@
+{
+  "manifest_version": 3,
+  "name": "逆お気に入り for nifty不動産",
+  "version": "0.1.0",
+  "description": "nifty不動産の中古一戸建てに、候補・保留・却下の判断と理由・メモをローカル保存します。",
+  "permissions": [
+    "storage"
+  ],
+  "action": {
+    "default_title": "逆お気に入り",
+    "default_popup": "popup/popup.html"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://myhome.nifty.com/chuko-ikkodate/*"
+      ],
+      "js": [
+        "src/shared.js",
+        "src/content.js"
+      ],
+      "css": [
+        "src/content.css"
+      ],
+      "run_at": "document_idle"
+    }
+  ]
+}

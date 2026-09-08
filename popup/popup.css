@@ -1,0 +1,183 @@
+:root {
+  color: #263238;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans JP", sans-serif;
+  font-size: 14px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  width: 360px;
+  margin: 0;
+  background: #f4f8f9;
+}
+
+.header {
+  padding: 20px 20px 17px;
+  background: linear-gradient(135deg, #244c57, #397485);
+  color: #fff;
+}
+
+.eyebrow,
+.lead,
+h1,
+h2,
+footer p {
+  margin: 0;
+}
+
+.eyebrow {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  opacity: 0.75;
+  text-transform: uppercase;
+}
+
+h1 {
+  margin-top: 2px;
+  font-size: 23px;
+}
+
+.lead {
+  margin-top: 5px;
+  font-size: 12px;
+  opacity: 0.85;
+}
+
+main {
+  display: grid;
+  gap: 18px;
+  padding: 18px 16px;
+}
+
+h2 {
+  margin-bottom: 9px;
+  color: #455a64;
+  font-size: 13px;
+}
+
+.counts {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 7px;
+}
+
+.count {
+  display: grid;
+  place-items: center;
+  padding: 10px 5px 8px;
+  border: 1px solid #d4dee2;
+  border-radius: 9px;
+  background: #fff;
+}
+
+.count strong {
+  font-size: 22px;
+  line-height: 1.1;
+}
+
+.count span {
+  margin-top: 3px;
+  color: #607d8b;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.count--candidate strong { color: #a47400; }
+.count--hold strong { color: #326b9e; }
+.count--rejected strong { color: #b12b35; }
+
+.recent-list {
+  display: grid;
+  gap: 7px;
+}
+
+.recent-item {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 8px;
+  align-items: start;
+  padding: 9px 10px;
+  border: 1px solid #d4dee2;
+  border-radius: 8px;
+  background: #fff;
+  color: inherit;
+  text-decoration: none;
+}
+
+.recent-item:hover,
+.recent-item:focus-visible {
+  border-color: #397485;
+  outline: 2px solid #b9dce4;
+}
+
+.badge {
+  min-width: 43px;
+  padding: 2px 5px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 800;
+  text-align: center;
+}
+
+.badge--candidate { background: #fff0b5; color: #765400; }
+.badge--hold { background: #deedff; color: #174f80; }
+.badge--rejected { background: #ffe1e3; color: #9e202b; }
+.badge--unrated { background: #eceff1; color: #546e7a; }
+
+.recent-text {
+  min-width: 0;
+}
+
+.recent-title,
+.recent-note {
+  overflow: hidden;
+  margin: 0;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.recent-title {
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.recent-note {
+  margin-top: 2px;
+  color: #78909c;
+  font-size: 10px;
+}
+
+.empty {
+  padding: 18px 12px;
+  border: 1px dashed #b0bec5;
+  border-radius: 8px;
+  color: #78909c;
+  font-size: 12px;
+  text-align: center;
+}
+
+footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 16px;
+  border-top: 1px solid #d4dee2;
+  background: #fff;
+}
+
+footer p {
+  color: #78909c;
+  font-size: 9px;
+}
+
+footer a {
+  color: #315d6a;
+  font-size: 11px;
+  font-weight: 800;
+  white-space: nowrap;
+}
