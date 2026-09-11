@@ -42,6 +42,14 @@
     "その他"
   ]);
 
+  const MEMO_SHORTCUTS = Object.freeze([
+    "部屋数不足",
+    "1F部屋数不足",
+    "1F南向き部屋不足",
+    "2Fトイレなし",
+    "ハザード情報未取得"
+  ]);
+
   const DEFAULT_SETTINGS = Object.freeze({
     hideRejected: false
   });
@@ -164,6 +172,7 @@
 
   return Object.freeze({
     DEFAULT_SETTINGS,
+    MEMO_SHORTCUTS,
     REJECTION_REASONS,
     SCHEMA_VERSION,
     SETTINGS_KEY,

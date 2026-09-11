@@ -408,7 +408,7 @@
     });
     reasonsFieldset.append(reasonChoices);
 
-    const memoLabel = createElement("label", { className: "pe-memo" });
+    const memoLabel = createElement("div", { className: "pe-memo" });
     memoLabel.append(createElement("span", { className: "pe-label", text: "一言メモ" }));
     const memo = createElement("textarea", {
       attributes: {
@@ -418,7 +418,33 @@
       }
     });
     memo.value = record.memo;
-    memoLabel.append(memo);
+
+    const memoShortcuts = createElement("div", {
+      className: "pe-memo-shortcuts",
+      attributes: { "aria-label": "一言メモのショートカット" }
+    });
+    core.MEMO_SHORTCUTS.forEach((shortcut) => {
+      const shortcutButton = createElement("button", {
+        className: "pe-memo-shortcut",
+        text: shortcut,
+        type: "button",
+        attributes: { "aria-label": `一言メモに「${shortcut}」を追加` }
+      });
+      shortcutButton.addEventListener("click", () => {
+        const separator = memo.value && !/[\s・、]$/.test(memo.value) ? "・" : "";
+        const nextValue = `${memo.value}${separator}${shortcut}`;
+        if (nextValue.length > memo.maxLength) {
+          showToast("一言メモは200文字までです", true);
+          return;
+        }
+
+        memo.value = nextValue;
+        memo.focus();
+        memo.setSelectionRange(memo.value.length, memo.value.length);
+      });
+      memoShortcuts.append(shortcutButton);
+    });
+    memoLabel.append(memoShortcuts, memo);
 
     const actions = createElement("div", { className: "pe-actions" });
     const saveButton = createElement("button", {

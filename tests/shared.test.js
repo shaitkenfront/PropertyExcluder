@@ -48,6 +48,16 @@ test("保存レコードを許可された値だけに正規化する", () => {
   assert.equal(record.url, "https://example.com/");
 });
 
+test("一言メモ用ショートカットを定義する", () => {
+  assert.deepEqual(core.MEMO_SHORTCUTS, [
+    "部屋数不足",
+    "1F部屋数不足",
+    "1F南向き部屋不足",
+    "2Fトイレなし",
+    "ハザード情報未取得"
+  ]);
+});
+
 test("却下以外の状態では却下理由を保持しない", () => {
   const record = core.sanitizeRecord({
     status: core.STATUS.CANDIDATE,

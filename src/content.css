@@ -291,6 +291,35 @@
   outline-offset: 2px;
 }
 
+.pe-memo-shortcuts {
+  display: flex;
+  flex-wrap: wrap;
+  min-width: 0;
+  gap: 6px;
+  margin: 5px 0 7px;
+}
+
+.pe-memo-shortcut {
+  min-height: 28px;
+  padding: 4px 9px;
+  border: 1px solid #b0c9d0;
+  border-radius: 999px;
+  background: #f4fafb;
+  color: #315d6a;
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.pe-memo-shortcut:hover,
+.pe-memo-shortcut:focus-visible {
+  border-color: #315d6a;
+  background: #e2f2f5;
+  outline: 2px solid #b9dce4;
+  outline-offset: 1px;
+}
+
 .pe-memo textarea {
   display: block;
   width: 100%;
