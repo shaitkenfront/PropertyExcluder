@@ -44,7 +44,8 @@ npm run check
 
 ## 対応範囲
 
-- 対応: `https://myhome.nifty.com/chuko-ikkodate/*`
+- 対応: `https://myhome.nifty.com/chuko-ikkodate/<都道府県>/<市区町村>/...` の一覧・詳細ページ
+- 対象外: `https://myhome.nifty.com/chuko-ikkodate/<都道府県>/` の条件設定ページ
 - MVP対象外: 新築一戸建て、マンション、土地、賃貸
 
 nifty不動産側のHTML構造が大きく変わった場合は、`src/content.js` のカード検出または詳細画面の挿入位置を調整する必要があります。

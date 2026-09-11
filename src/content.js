@@ -2,7 +2,7 @@
   "use strict";
 
   const core = globalThis.PropertyExcluderCore;
-  if (!core || !location.pathname.startsWith("/chuko-ikkodate/")) {
+  if (!core || !core.isSupportedPathname(location.pathname)) {
     return;
   }
 
@@ -207,13 +207,14 @@
     const preferred = anchor.closest(".card.is-bg-light.is-floating-shadow");
     if (preferred) return preferred;
 
-    let current = anchor.parentElement;
-    for (let depth = 0; current && depth < 9; depth += 1) {
-      if (current.querySelector("h2") && current.querySelector('a[href*="/detail_"]')) {
-        return current;
-      }
-      current = current.parentElement;
+    const listItem = anchor.closest("li");
+    if (!listItem) return null;
+
+    const candidate = listItem.firstElementChild;
+    if (candidate?.querySelector('a[href*="/detail_"]')) {
+      return candidate;
     }
+
     return null;
   }
 
@@ -344,7 +345,10 @@
 
   function scanListPage() {
     const seenCards = new Set();
-    document.querySelectorAll('a[href*="/chuko-ikkodate/"][href*="/detail_"]').forEach((anchor) => {
+    const resultList = document.querySelector('[data-contents-id="result-bukken-list"]');
+    if (!resultList) return;
+
+    resultList.querySelectorAll('a[href*="/chuko-ikkodate/"][href*="/detail_"]').forEach((anchor) => {
       const propertyId = core.extractPropertyId(anchor.href);
       const card = findCardRoot(anchor);
       if (!propertyId || !card || seenCards.has(card)) return;

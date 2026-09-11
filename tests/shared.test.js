@@ -21,6 +21,17 @@ test("対象外URLからは物件番号を抽出しない", () => {
   assert.equal(core.extractPropertyId(null), null);
 });
 
+test("条件設定画面では拡張機能を動作させず、一覧・詳細画面では動作させる", () => {
+  assert.equal(core.isSupportedPathname("/chuko-ikkodate/okayama/"), false);
+  assert.equal(core.isSupportedPathname("/chuko-ikkodate/okayama/kurashikishi_ct/"), true);
+  assert.equal(
+    core.isSupportedPathname(
+      "/chuko-ikkodate/okayama/kurashikishi_ct/detail_6e907341b0de33f3a99e619f642941d4/"
+    ),
+    true
+  );
+});
+
 test("保存レコードを許可された値だけに正規化する", () => {
   const record = core.sanitizeRecord({
     status: core.STATUS.REJECTED,

@@ -4,14 +4,30 @@
 }
 
 .pe-root {
+  min-width: 0;
+  max-width: 100%;
   color: #263238;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans JP", sans-serif;
   line-height: 1.5;
 }
 
+.pe-root * {
+  min-width: 0;
+  max-width: 100%;
+}
+
+/* nifty不動産の結果カラムは flex の最小幅が自動のため、
+   注入UIの内容幅でサイドバー側へ押し広げられないようにする。 */
+#resultAjaxAllArea,
+#resultAjaxArea,
+#resultAjaxAllArea [data-contents-id="result-bukken-list"] {
+  min-width: 0;
+}
+
 .pe-card-panel {
   position: relative;
   z-index: 2;
+  width: 100%;
   margin: 0;
   border-bottom: 1px solid #d9e2e6;
   background: #f7fafb;
@@ -32,6 +48,7 @@
   grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
   width: 100%;
+  min-width: 0;
   min-height: 44px;
   gap: 10px;
   padding: 7px 12px;
@@ -50,6 +67,7 @@
 }
 
 .pe-card-description {
+  min-width: 0;
   overflow: hidden;
   color: #455a64;
   font-size: 12px;
@@ -106,6 +124,8 @@
 
 .pe-editor {
   display: grid;
+  width: 100%;
+  min-width: 0;
   gap: 16px;
   padding-top: 16px;
 }
@@ -135,10 +155,12 @@
 .pe-status-choices {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
+  min-width: 0;
   gap: 6px;
 }
 
 .pe-status-choice {
+  min-width: 0;
   min-height: 38px;
   padding: 6px 8px;
   border: 1px solid #b0bec5;
@@ -188,11 +210,14 @@
 .pe-reason-choices {
   display: flex;
   flex-wrap: wrap;
+  min-width: 0;
   gap: 7px;
 }
 
 .pe-reason {
   position: relative;
+  min-width: 0;
+  max-width: 100%;
   cursor: pointer;
 }
 
@@ -205,6 +230,7 @@
 
 .pe-reason span {
   display: block;
+  overflow-wrap: anywhere;
   padding: 5px 10px;
   border: 1px solid #c5d0d5;
   border-radius: 999px;
@@ -285,6 +311,8 @@
 }
 
 .pe-detail-panel {
+  width: 100%;
+  min-width: 0;
   margin: 18px 0 24px;
   padding: 20px;
   border: 2px solid #78909c;
@@ -312,6 +340,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
+  min-width: 0;
   gap: 16px;
 }
 
@@ -345,6 +374,10 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  flex-wrap: wrap;
   gap: 14px;
   margin: 12px 0;
   padding: 10px 14px;
@@ -356,6 +389,7 @@
 .pe-filter-label {
   display: inline-flex;
   align-items: center;
+  min-width: 0;
   gap: 8px;
   color: #37474f;
   cursor: pointer;

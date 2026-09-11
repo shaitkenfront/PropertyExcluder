@@ -55,6 +55,14 @@
     return match ? match[1].toLowerCase() : null;
   }
 
+  function isSupportedPathname(pathname) {
+    if (typeof pathname !== "string") {
+      return false;
+    }
+
+    return /^\/chuko-ikkodate\/[^/]+\/[^/]+(?:\/|$)/.test(pathname);
+  }
+
   function propertyStorageKey(propertyId) {
     return `${STORAGE_PREFIX}${propertyId}`;
   }
@@ -164,6 +172,7 @@
     STORAGE_PREFIX,
     emptyRecord,
     extractPropertyId,
+    isSupportedPathname,
     isEffectivelyEmpty,
     loadAllRecords,
     loadRecord,
