@@ -1,14 +1,34 @@
 (function initializePropertyExcluder() {
   "use strict";
 
+  const HAZARD_API_URL = "https://zht5wuwzjb.execute-api.ap-northeast-1.amazonaws.com/default/hazard_api_function";
+  const HAZARD_RETRY_DELAY_MS = 500;
+  const HAZARD_MAX_RETRIES = 20;
+  const BUILDING_AREA_OPTION_VALUE = "150";
+
   const core = globalThis.PropertyExcluderCore;
-  if (!core || !core.isSupportedPathname(location.pathname)) {
+  if (!core) {
+    return;
+  }
+
+  installBuildingAreaOptionEnhancement();
+
+  if (!core.isSupportedPathname(location.pathname)) {
     return;
   }
 
   const state = {
     records: new Map(),
     settings: { ...core.DEFAULT_SETTINGS },
+    collapsedRejected: new Set(),
+    hazard: {
+      coordinateKey: "",
+      response: null,
+      status: "idle",
+      open: false,
+      retryCount: 0,
+      retryTimer: null
+    },
     scanScheduled: false
   };
 
@@ -25,6 +45,38 @@
     return element;
   }
 
+  function enhanceBuildingAreaOptions() {
+    document.querySelectorAll('select[name="b10"]').forEach((select) => {
+      if (select.querySelector(`option[value="${BUILDING_AREA_OPTION_VALUE}"]`)) {
+        return;
+      }
+
+      const sourceOption = select.querySelector('option[value="100"]');
+      const option = document.createElement("option");
+      option.value = BUILDING_AREA_OPTION_VALUE;
+      option.textContent = "150平米以上";
+
+      if (sourceOption) {
+        [...sourceOption.attributes].forEach((attribute) => {
+          if (attribute.name !== "value" && attribute.name !== "selected") {
+            option.setAttribute(attribute.name, attribute.value);
+          }
+        });
+      }
+
+      select.append(option);
+    });
+  }
+
+  function installBuildingAreaOptionEnhancement() {
+    enhanceBuildingAreaOptions();
+
+    const observer = new MutationObserver(() => {
+      enhanceBuildingAreaOptions();
+    });
+    observer.observe(document.documentElement, { childList: true, subtree: true });
+  }
+
   function currentRecord(propertyId) {
     return state.records.get(propertyId) || core.emptyRecord(propertyId);
   }
@@ -37,6 +89,229 @@
       return parsed.href;
     } catch (_error) {
       return location.href;
+    }
+  }
+
+  function findMapCoordinates() {
+    const map = document.querySelector(
+      "#detailSurroundingMap[data-latitude][data-longitude]"
+    ) || document.querySelector("[data-latitude][data-longitude]");
+    if (!map) return null;
+
+    const latitude = Number(map.getAttribute("data-latitude"));
+    const longitude = Number(map.getAttribute("data-longitude"));
+    if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return null;
+
+    return {
+      latitude,
+      longitude,
+      key: `${latitude},${longitude}`
+    };
+  }
+
+  function findAddressRow() {
+    const marker = [...document.querySelectorAll("svg use")].find((use) => {
+      const href = use.getAttribute("href") || use.getAttribute("xlink:href") || "";
+      return href.includes("#map-marker");
+    });
+    return marker?.closest(".box.is-flex") || null;
+  }
+
+  function ensureHazardPanel() {
+    const addressRow = findAddressRow();
+    if (!addressRow) return null;
+
+    const parent = addressRow.parentElement;
+    const existing = parent?.querySelector(":scope > .pe-hazard-panel");
+    if (existing) return existing;
+
+    const panel = createElement("div", {
+      className: "pe-root pe-hazard-panel"
+    });
+    const button = createElement("button", {
+      className: "pe-hazard-button",
+      text: "ハザード情報",
+      type: "button",
+      attributes: { "aria-expanded": "false" }
+    });
+    const popover = createElement("div", {
+      className: "pe-hazard-popover",
+      attributes: { hidden: "" }
+    });
+
+    button.addEventListener("click", (event) => {
+      event.stopPropagation();
+      state.hazard.open = !state.hazard.open;
+      if (state.hazard.open && ["idle", "error", "unavailable"].includes(state.hazard.status)) {
+        state.hazard.status = "idle";
+        state.hazard.retryCount = 0;
+        renderHazardPanel("loading");
+        loadHazardInfo();
+        return;
+      }
+      renderHazardPanel(state.hazard.status, state.hazard.response);
+    });
+
+    panel.append(button, popover);
+    addressRow.insertAdjacentElement("afterend", panel);
+    return panel;
+  }
+
+  function formatProbability(data) {
+    if (!data || typeof data !== "object") return "データなし";
+
+    const format = (value) => {
+      const number = Number(value);
+      return Number.isFinite(number) ? `${Math.floor(number * 100)}%` : "データなし";
+    };
+    return `周辺100m最大: ${format(data.max_prob)} / 中心点: ${format(data.center_prob)}`;
+  }
+
+  function formatHazardRange(data) {
+    if (!data || typeof data !== "object") return "データなし";
+
+    const max = data.max_info ?? "データなし";
+    const center = data.center_info ?? "データなし";
+    return `周辺100m最大: ${max} / 中心点: ${center}`;
+  }
+
+  function formatLandslide(data) {
+    if (!data || typeof data !== "object") return "データなし";
+
+    return [
+      ["土石流", data.debris_flow],
+      ["急傾斜地", data.steep_slope],
+      ["地すべり", data.landslide]
+    ]
+      .map(([label, value]) => `${label}: ${formatHazardRange(value)}`)
+      .join("\n");
+  }
+
+  function hazardRows(hazardInfo) {
+    return [
+      ["30年以内に震度5強以上の地震", formatProbability(hazardInfo.jshis_prob_50)],
+      ["30年以内に震度6弱以上の地震", formatProbability(hazardInfo.jshis_prob_55)],
+      ["30年以内に震度6強以上の地震", formatProbability(hazardInfo.jshis_prob_60)],
+      ["想定最大浸水深", formatHazardRange(hazardInfo.inundation_depth)],
+      ["浸水継続時間", formatHazardRange(hazardInfo.flood_keizoku)],
+      ["内水浸水想定区域", formatHazardRange(hazardInfo.naisui_inundation)],
+      ["家屋倒壊等氾濫想定区域（氾濫流）", formatHazardRange(hazardInfo.kaokutoukai_hanran)],
+      ["家屋倒壊等氾濫想定区域（河岸侵食）", formatHazardRange(hazardInfo.kaokutoukai_kagan)],
+      ["津波浸水想定", formatHazardRange(hazardInfo.tsunami_inundation)],
+      ["高潮浸水想定", formatHazardRange(hazardInfo.hightide_inundation)],
+      ["土砂災害警戒・特別警戒区域", formatLandslide(hazardInfo.landslide_hazard)],
+      ["大規模盛土造成地", formatHazardRange(hazardInfo.large_fill_land)],
+      ["雪崩危険箇所", formatHazardRange(hazardInfo.avalanche)]
+    ];
+  }
+
+  function renderHazardPanel(status, payload = null) {
+    const panel = ensureHazardPanel();
+    if (!panel) return false;
+
+    const button = panel.querySelector(":scope > .pe-hazard-button");
+    const popover = panel.querySelector(":scope > .pe-hazard-popover");
+    if (!button || !popover) return false;
+
+    panel.classList.toggle("pe-hazard-panel--error", status === "error");
+    button.textContent = "ハザード情報";
+    button.setAttribute("aria-expanded", String(state.hazard.open));
+    popover.hidden = !state.hazard.open;
+    popover.replaceChildren();
+    if (!state.hazard.open) return true;
+
+    if (status === "loading") {
+      popover.append(createElement("p", {
+        className: "pe-hazard-message",
+        text: "ハザード情報を取得中…"
+      }));
+      return true;
+    }
+
+    const body = createElement("div", { className: "pe-hazard-body" });
+    if (status === "error") {
+      body.append(createElement("p", {
+        className: "pe-hazard-message",
+        text: "ハザード情報を取得できませんでした。"
+      }));
+      popover.append(body);
+      return true;
+    }
+
+    if (status === "unavailable") {
+      body.append(createElement("p", {
+        className: "pe-hazard-message",
+        text: "Googleマップの座標を取得できませんでした。"
+      }));
+      popover.append(body);
+      return true;
+    }
+
+    const rows = createElement("dl", { className: "pe-hazard-list" });
+    hazardRows(payload?.hazard_info || {}).forEach(([label, value]) => {
+      rows.append(
+        createElement("dt", { className: "pe-hazard-label", text: label }),
+        createElement("dd", { className: "pe-hazard-value", text: value })
+      );
+    });
+    body.append(rows);
+    popover.append(body);
+    return true;
+  }
+
+  function scheduleHazardInfo() {
+    if (state.hazard.retryTimer || ["loading", "loaded", "error", "unavailable"].includes(state.hazard.status)) {
+      return;
+    }
+
+    state.hazard.retryTimer = window.setTimeout(() => {
+      state.hazard.retryTimer = null;
+      loadHazardInfo();
+    }, HAZARD_RETRY_DELAY_MS);
+  }
+
+  async function loadHazardInfo() {
+    const coordinates = findMapCoordinates();
+    if (!coordinates) {
+      state.hazard.retryCount += 1;
+      if (state.hazard.retryCount <= HAZARD_MAX_RETRIES) {
+        scheduleHazardInfo();
+      } else {
+        state.hazard.status = "unavailable";
+        renderHazardPanel("unavailable");
+      }
+      return;
+    }
+
+    if (state.hazard.coordinateKey === coordinates.key && state.hazard.status === "loaded") {
+      renderHazardPanel("loaded", state.hazard.response);
+      return;
+    }
+
+    state.hazard.coordinateKey = coordinates.key;
+    state.hazard.status = "loading";
+    state.hazard.retryCount = 0;
+    renderHazardPanel("loading");
+
+    try {
+      const url = new URL(HAZARD_API_URL);
+      url.searchParams.set("lat", String(coordinates.latitude));
+      url.searchParams.set("lon", String(coordinates.longitude));
+      url.searchParams.set("precision", "low");
+
+      const response = await fetch(url.href);
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+      const payload = await response.json();
+      if (payload.status !== "success") throw new Error("API returned an error");
+
+      state.hazard.response = payload;
+      state.hazard.status = "loaded";
+      renderHazardPanel("loaded", payload);
+    } catch (error) {
+      console.error("[逆お気に入り] ハザード情報の取得に失敗しました", error);
+      state.hazard.status = "error";
+      renderHazardPanel("error");
     }
   }
 
@@ -224,6 +499,9 @@
 
   function renderCard(card, propertyId) {
     const record = currentRecord(propertyId);
+    const rejected = record.status === core.STATUS.REJECTED;
+    if (!rejected) state.collapsedRejected.delete(propertyId);
+    const collapsed = rejected && state.collapsedRejected.has(propertyId);
     const panel = card.querySelector(":scope > .pe-card-panel") || createElement("div", {
       className: "pe-root pe-card-panel"
     });
@@ -235,7 +513,8 @@
 
     if (!panel.parentElement) card.prepend(panel);
     card.dataset.peCardId = propertyId;
-    card.classList.toggle("pe-card--rejected", record.status === core.STATUS.REJECTED);
+    card.classList.toggle("pe-card--rejected", rejected);
+    card.classList.toggle("pe-card--collapsed", collapsed);
 
     const summary = createElement("button", {
       className: "pe-card-summary",
@@ -265,7 +544,28 @@
       }));
     });
 
-    panel.replaceChildren(summary);
+    const header = createElement("div", { className: "pe-card-header" });
+    header.append(summary);
+
+    if (rejected) {
+      const collapseButton = createElement("button", {
+        className: "pe-card-collapse",
+        text: collapsed ? "展開" : "折り畳む",
+        type: "button",
+        attributes: {
+          "aria-expanded": String(!collapsed),
+          "aria-label": collapsed ? "却下済みカードを展開" : "却下済みカードを折り畳む"
+        }
+      });
+      collapseButton.addEventListener("click", () => {
+        if (collapsed) state.collapsedRejected.delete(propertyId);
+        else state.collapsedRejected.add(propertyId);
+        renderCard(card, propertyId);
+      });
+      header.append(collapseButton);
+    }
+
+    panel.replaceChildren(header);
     cardWrapper(card).classList.toggle(
       "pe-is-hidden",
       state.settings.hideRejected && record.status === core.STATUS.REJECTED
@@ -322,7 +622,13 @@
 
   function scanDetailPage() {
     const propertyId = core.extractPropertyId(location.href);
-    if (!propertyId || document.querySelector(`[data-pe-detail-id="${propertyId}"]`)) return;
+    if (!propertyId) return;
+
+    const existingPanel = document.querySelector(`[data-pe-detail-id="${propertyId}"]`);
+    if (existingPanel) {
+      ensureHazardPanel();
+      return;
+    }
 
     const summary = document.querySelector("#summary");
     const heading = summary?.querySelector("h1") || document.querySelector("main h1");
@@ -341,6 +647,7 @@
       heading.insertAdjacentElement("afterend", panel);
     }
     renderDetail(panel, propertyId);
+    ensureHazardPanel();
   }
 
   function scanListPage() {
@@ -443,6 +750,23 @@
     }, true);
   }
 
+  function installHazardPopoverGuard() {
+    document.addEventListener("click", (event) => {
+      if (event.target.closest?.(".pe-hazard-panel")) return;
+      if (!state.hazard.open) return;
+
+      state.hazard.open = false;
+      renderHazardPanel(state.hazard.status, state.hazard.response);
+    }, true);
+
+    document.addEventListener("keydown", (event) => {
+      if (event.key !== "Escape" || !state.hazard.open) return;
+
+      state.hazard.open = false;
+      renderHazardPanel(state.hazard.status, state.hazard.response);
+    });
+  }
+
   async function start() {
     try {
       const [records, settings] = await Promise.all([
@@ -457,6 +781,7 @@
 
     scanPage();
     installRejectedNavigationGuard();
+    installHazardPopoverGuard();
 
     const observer = new MutationObserver((mutations) => {
       const hasSiteMutation = mutations.some((mutation) => (
