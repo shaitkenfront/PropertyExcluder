@@ -5,7 +5,7 @@
   "description": "nifty不動産の判断をローカル保存するChrome拡張",
   "scripts": {
     "test": "node --test",
-    "check": "node --check src/shared.js && node --check src/content.js && node --check popup/popup.js && node --test && node -e \"JSON.parse(require('node:fs').readFileSync('manifest.json', 'utf8'))\""
+    "check": "node --check src/shared.js && node --check src/content.js && node --check src/page-geocoder.js && node --check popup/popup.js && node --test && node -e \"JSON.parse(require('node:fs').readFileSync('manifest.json', 'utf8'))\""
   },
   "engines": {
     "node": ">=20"

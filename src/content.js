@@ -5,6 +5,9 @@
   const HAZARD_RETRY_DELAY_MS = 500;
   const HAZARD_MAX_RETRIES = 20;
   const BUILDING_AREA_OPTION_VALUE = "150";
+  const GEOCODE_REQUEST_EVENT = "property-excluder:geocode-request";
+  const GEOCODE_RESPONSE_EVENT = "property-excluder:geocode-response";
+  const GEOCODE_TIMEOUT_MS = 12000;
 
   const core = globalThis.PropertyExcluderCore;
   if (!core) {
@@ -29,6 +32,14 @@
       retryCount: 0,
       retryTimer: null
     },
+    geocode: {
+      coordinateKey: "",
+      address: "",
+      status: "idle",
+      requestId: "",
+      timeoutTimer: null
+    },
+    printMode: false,
     scanScheduled: false
   };
 
@@ -92,10 +103,14 @@
     }
   }
 
-  function findMapCoordinates() {
-    const map = document.querySelector(
+  function findMapElement() {
+    return document.querySelector(
       "#detailSurroundingMap[data-latitude][data-longitude]"
     ) || document.querySelector("[data-latitude][data-longitude]");
+  }
+
+  function findMapCoordinates() {
+    const map = findMapElement();
     if (!map) return null;
 
     const latitude = Number(map.getAttribute("data-latitude"));
@@ -107,6 +122,138 @@
       longitude,
       key: `${latitude},${longitude}`
     };
+  }
+
+  function ensureGeocodedAddressPanel() {
+    const map = findMapElement();
+    const detailHead = document.querySelector('div[data-contents-id="detail-head-contents"]');
+    if (!map || !detailHead) return null;
+
+    const existing = document.querySelector(".pe-geocoded-address");
+    if (existing) {
+      if (detailHead.nextElementSibling !== existing) {
+        detailHead.insertAdjacentElement("afterend", existing);
+      }
+      return existing;
+    }
+
+    const panel = createElement("div", {
+      className: "pe-root pe-geocoded-address",
+      attributes: { role: "status", "aria-live": "polite" }
+    });
+    panel.append(
+      createElement("span", {
+        className: "pe-geocoded-address-label",
+        text: "座標から取得した住所"
+      }),
+      createElement("span", { className: "pe-geocoded-address-value" })
+    );
+    detailHead.insertAdjacentElement("afterend", panel);
+    return panel;
+  }
+
+  function renderGeocodedAddress() {
+    const panel = ensureGeocodedAddressPanel();
+    if (!panel) return false;
+
+    const value = panel.querySelector(":scope > .pe-geocoded-address-value");
+    if (!value) return false;
+
+    panel.dataset.status = state.geocode.status;
+    if (state.geocode.status === "loaded") {
+      const coordinates = findMapCoordinates();
+      if (!coordinates) {
+        value.textContent = state.geocode.address;
+        return true;
+      }
+
+      const mapsUrl = new URL("https://www.google.com/maps/search/");
+      mapsUrl.searchParams.set("api", "1");
+      mapsUrl.searchParams.set(
+        "query",
+        `${coordinates.latitude},${coordinates.longitude}`
+      );
+      value.replaceChildren(createElement("a", {
+        className: "pe-geocoded-address-link",
+        text: state.geocode.address,
+        attributes: {
+          href: mapsUrl.href,
+          target: "_blank",
+          rel: "noopener noreferrer",
+          title: "Googleマップで開く"
+        }
+      }));
+    } else if (state.geocode.status === "error") {
+      value.textContent = "住所を取得できませんでした";
+    } else {
+      value.textContent = "住所を取得中…";
+    }
+    return true;
+  }
+
+  function requestGeocodedAddress(coordinates) {
+    if (state.geocode.timeoutTimer) {
+      window.clearTimeout(state.geocode.timeoutTimer);
+    }
+
+    state.geocode.coordinateKey = coordinates.key;
+    state.geocode.address = "";
+    state.geocode.status = "loading";
+    state.geocode.requestId = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    renderGeocodedAddress();
+
+    document.dispatchEvent(new CustomEvent(GEOCODE_REQUEST_EVENT, {
+      detail: JSON.stringify({
+        requestId: state.geocode.requestId,
+        latitude: coordinates.latitude,
+        longitude: coordinates.longitude
+      })
+    }));
+
+    const requestId = state.geocode.requestId;
+    state.geocode.timeoutTimer = window.setTimeout(() => {
+      state.geocode.timeoutTimer = null;
+      if (state.geocode.requestId !== requestId || state.geocode.status !== "loading") {
+        return;
+      }
+      state.geocode.status = "error";
+      renderGeocodedAddress();
+    }, GEOCODE_TIMEOUT_MS);
+  }
+
+  function ensureGeocodedAddress() {
+    const coordinates = findMapCoordinates();
+    if (!coordinates) return false;
+
+    if (state.geocode.coordinateKey !== coordinates.key) {
+      requestGeocodedAddress(coordinates);
+      return true;
+    }
+
+    renderGeocodedAddress();
+    return true;
+  }
+
+  function installGeocoderResponseListener() {
+    document.addEventListener(GEOCODE_RESPONSE_EVENT, (event) => {
+      let detail;
+      try {
+        detail = JSON.parse(event.detail);
+      } catch (_error) {
+        return;
+      }
+      if (!detail || detail.requestId !== state.geocode.requestId) return;
+
+      if (state.geocode.timeoutTimer) {
+        window.clearTimeout(state.geocode.timeoutTimer);
+        state.geocode.timeoutTimer = null;
+      }
+
+      const address = typeof detail.address === "string" ? detail.address.trim() : "";
+      state.geocode.address = address;
+      state.geocode.status = detail.status === "success" && address ? "loaded" : "error";
+      renderGeocodedAddress();
+    });
   }
 
   function findAddressRow() {
@@ -598,6 +745,26 @@
     );
   }
 
+  function createPrintModeToggle(panel) {
+    const label = createElement("label", { className: "pe-print-mode-toggle" });
+    const checkbox = createElement("input", { type: "checkbox" });
+    checkbox.checked = state.printMode;
+    checkbox.addEventListener("change", () => {
+      state.printMode = checkbox.checked;
+      panel.classList.toggle("pe-detail-panel--print", state.printMode);
+    });
+
+    label.append(
+      checkbox,
+      createElement("span", {
+        className: "pe-print-mode-switch",
+        attributes: { "aria-hidden": "true" }
+      }),
+      createElement("span", { className: "pe-print-mode-label", text: "印刷モード" })
+    );
+    return label;
+  }
+
   function renderDetail(panel, propertyId) {
     const record = currentRecord(propertyId);
     const title = (document.querySelector("h1")?.textContent || record.title || "中古一戸建て")
@@ -605,14 +772,21 @@
       .replace(/\s+/g, " ");
     const url = normalizedUrl(location.href);
 
-    panel.className = `pe-root pe-detail-panel pe-detail-panel--${record.status}`;
+    panel.className = [
+      "pe-root",
+      "pe-detail-panel",
+      `pe-detail-panel--${record.status}`,
+      state.printMode ? "pe-detail-panel--print" : ""
+    ].filter(Boolean).join(" ");
     const heading = createElement("div", { className: "pe-detail-heading" });
-    const headingText = createElement("div");
+    const headingText = createElement("div", { className: "pe-detail-heading-text" });
     headingText.append(
       createElement("p", { className: "pe-eyebrow", text: "逆お気に入り" }),
       createElement("h2", { className: "pe-title", text: "この物件の判断" })
     );
-    heading.append(headingText, statusBadge(record));
+    const headingActions = createElement("div", { className: "pe-detail-heading-actions" });
+    headingActions.append(statusBadge(record), createPrintModeToggle(panel));
+    heading.append(headingText, headingActions);
 
     if (record.status === core.STATUS.REJECTED) {
       const warning = createElement("div", {
@@ -653,6 +827,7 @@
     const existingPanel = document.querySelector(`[data-pe-detail-id="${propertyId}"]`);
     if (existingPanel) {
       ensureHazardPanel();
+      ensureGeocodedAddress();
       return;
     }
 
@@ -674,6 +849,7 @@
     }
     renderDetail(panel, propertyId);
     ensureHazardPanel();
+    ensureGeocodedAddress();
   }
 
   function scanListPage() {
@@ -805,6 +981,7 @@
       console.error("[逆お気に入り] 保存データを読み込めませんでした", error);
     }
 
+    installGeocoderResponseListener();
     scanPage();
     installRejectedNavigationGuard();
     installHazardPopoverGuard();

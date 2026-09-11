@@ -19,6 +19,16 @@
         "https://myhome.nifty.com/chuko-ikkodate/*"
       ],
       "js": [
+        "src/page-geocoder.js"
+      ],
+      "run_at": "document_idle",
+      "world": "MAIN"
+    },
+    {
+      "matches": [
+        "https://myhome.nifty.com/chuko-ikkodate/*"
+      ],
+      "js": [
         "src/shared.js",
         "src/content.js"
       ],

@@ -405,6 +405,63 @@
   background: #fff8f8;
 }
 
+.pe-geocoded-address {
+  display: flex;
+  align-items: flex-start;
+  width: 100%;
+  min-width: 0;
+  gap: 10px;
+  margin: 0 0 8px;
+  padding: 9px 12px;
+  border-left: 4px solid #4285f4;
+  border-radius: 6px;
+  background: #f4f8ff;
+  color: #263238;
+}
+
+.pe-geocoded-address-label {
+  flex: 0 0 auto;
+  color: #315d6a;
+  font-size: 12px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.pe-geocoded-address-value {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font-size: 13px;
+}
+
+.pe-geocoded-address-link {
+  color: #0768ad;
+  font-weight: 700;
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 2px;
+}
+
+.pe-geocoded-address-link:hover,
+.pe-geocoded-address-link:focus-visible {
+  color: #034d82;
+  outline: 2px solid #80b9c6;
+  outline-offset: 2px;
+}
+
+.pe-geocoded-address[data-status="loading"] .pe-geocoded-address-value {
+  color: #607d8b;
+}
+
+.pe-geocoded-address[data-status="error"] {
+  border-left-color: #c73d45;
+  background: #fff8f8;
+}
+
+.pe-geocoded-address[data-status="error"] .pe-geocoded-address-value {
+  color: #a02630;
+}
+
 .pe-hazard-panel {
   position: relative;
   /* 吹き出し全体をサイト側の固定タブより前面に表示する。 */
@@ -508,6 +565,89 @@
   gap: 16px;
 }
 
+.pe-detail-heading-actions {
+  display: flex;
+  align-items: center;
+  flex: 0 0 auto;
+  gap: 10px;
+}
+
+.pe-print-mode-toggle {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: #455a64;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.pe-print-mode-toggle input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+}
+
+.pe-print-mode-switch {
+  position: relative;
+  flex: 0 0 38px;
+  width: 38px;
+  height: 22px;
+  border: 1px solid #9eafb5;
+  border-radius: 999px;
+  background: #cfd8dc;
+  transition: background 0.16s ease, border-color 0.16s ease;
+}
+
+.pe-print-mode-switch::after {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 4px rgb(38 50 56 / 28%);
+  content: "";
+  transition: transform 0.16s ease;
+}
+
+.pe-print-mode-toggle input:checked + .pe-print-mode-switch {
+  border-color: #315d6a;
+  background: #4f8998;
+}
+
+.pe-print-mode-toggle input:checked + .pe-print-mode-switch::after {
+  transform: translateX(16px);
+}
+
+.pe-print-mode-toggle input:focus-visible + .pe-print-mode-switch {
+  outline: 2px solid #80b9c6;
+  outline-offset: 2px;
+}
+
+.pe-detail-panel--print .pe-detail-heading {
+  justify-content: flex-end;
+}
+
+.pe-detail-panel--print .pe-detail-heading-text,
+.pe-detail-panel--print .pe-detail-heading-actions > .pe-status,
+.pe-detail-panel--print .pe-rejected-warning,
+.pe-detail-panel--print .pe-editor > .pe-fieldset,
+.pe-detail-panel--print .pe-memo > .pe-label,
+.pe-detail-panel--print .pe-memo-shortcuts,
+.pe-detail-panel--print .pe-actions {
+  display: none;
+}
+
+.pe-detail-panel--print .pe-editor {
+  gap: 0;
+  padding-top: 12px;
+}
+
 .pe-eyebrow {
   margin: 0 0 2px;
   color: #607d8b;
@@ -592,6 +732,16 @@
 
 .pe-toast--error {
   background: #a02630;
+}
+
+@media print {
+  .pe-detail-panel--print .pe-detail-heading {
+    display: none;
+  }
+
+  .pe-detail-panel--print .pe-editor {
+    padding-top: 0;
+  }
 }
 
 @media (max-width: 760px) {
