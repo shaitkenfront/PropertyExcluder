@@ -17,20 +17,41 @@
       <section aria-labelledby="summary-title">
         <h2 id="summary-title">保存した判断</h2>
         <div class="counts">
-          <div class="count count--candidate"><strong id="candidate-count">0</strong><span>候補</span></div>
-          <div class="count count--hold"><strong id="hold-count">0</strong><span>保留</span></div>
-          <div class="count count--rejected"><strong id="rejected-count">0</strong><span>却下</span></div>
+          <button class="count count--candidate" type="button" data-status="candidate" aria-pressed="false">
+            <strong id="candidate-count">0</strong><span>候補</span>
+          </button>
+          <button class="count count--hold" type="button" data-status="hold" aria-pressed="false">
+            <strong id="hold-count">0</strong><span>保留</span>
+          </button>
+          <button class="count count--rejected" type="button" data-status="rejected" aria-pressed="false">
+            <strong id="rejected-count">0</strong><span>却下</span>
+          </button>
         </div>
       </section>
 
       <section aria-labelledby="recent-title">
-        <h2 id="recent-title">最近の判断</h2>
+        <div class="list-heading">
+          <h2 id="recent-title">最近の判断</h2>
+          <button id="recent-view" class="back-button" type="button" hidden>最近の判断に戻す</button>
+        </div>
         <div id="recent-list" class="recent-list"></div>
+        <button id="list-more" class="list-more" type="button" hidden>さらに表示</button>
+      </section>
+
+      <section aria-labelledby="transfer-title">
+        <h2 id="transfer-title">データの持ち運び</h2>
+        <div class="transfer-actions">
+          <button id="export-data" class="transfer-button" type="button">エクスポート</button>
+          <button id="import-data" class="transfer-button" type="button">インポート</button>
+          <input id="import-file" type="file" accept="application/json,.json" hidden>
+        </div>
+        <p class="transfer-help">JSONファイルで別のPCへ判定情報を移せます。同じ物件はインポート側で上書きされます。</p>
+        <p id="transfer-status" class="transfer-status" aria-live="polite"></p>
       </section>
     </main>
 
     <footer>
-      <p>データはこのChrome内だけに保存されます。</p>
+      <p>データはクラウドへ送信されません。</p>
       <a href="https://myhome.nifty.com/chuko-ikkodate/search/" target="_blank" rel="noreferrer">中古一戸建てを探す</a>
     </footer>
 

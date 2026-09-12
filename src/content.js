@@ -103,6 +103,11 @@
     }
   }
 
+  function currentDetailPropertyId() {
+    const canonicalUrl = document.querySelector('link[rel="canonical"]')?.href || "";
+    return core.extractDetailPropertyId(location.href, canonicalUrl);
+  }
+
   function findMapElement() {
     return document.querySelector(
       "#detailSurroundingMap[data-latitude][data-longitude]"
@@ -820,8 +825,7 @@
     updateFilterSummary();
   }
 
-  function scanDetailPage() {
-    const propertyId = core.extractPropertyId(location.href);
+  function scanDetailPage(propertyId = currentDetailPropertyId()) {
     if (!propertyId) return;
 
     const existingPanel = document.querySelector(`[data-pe-detail-id="${propertyId}"]`);
@@ -918,7 +922,8 @@
 
   function scanPage() {
     state.scanScheduled = false;
-    if (core.extractPropertyId(location.href)) scanDetailPage();
+    const propertyId = currentDetailPropertyId();
+    if (propertyId) scanDetailPage(propertyId);
     else scanListPage();
   }
 
@@ -971,10 +976,18 @@
 
   async function start() {
     try {
-      const [records, settings] = await Promise.all([
+      let [records, settings] = await Promise.all([
         core.loadAllRecords(),
         core.loadSettings()
       ]);
+
+      const migration = await core.migrateMemoContainingSouthToHoldOnce();
+      if (migration.changed > 0) {
+        records = await core.loadAllRecords();
+        console.info(
+          `[逆お気に入り] 一言メモに「南」を含む${migration.changed}件を保留へ更新しました`
+        );
+      }
       records.forEach((record) => state.records.set(record.propertyId, record));
       state.settings = settings;
     } catch (error) {

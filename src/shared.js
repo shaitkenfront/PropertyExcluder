@@ -11,7 +11,10 @@
 
   const STORAGE_PREFIX = "propertyExcluder:property:";
   const SETTINGS_KEY = "propertyExcluder:settings";
+  const MEMO_SOUTH_TO_HOLD_MIGRATION_KEY = "propertyExcluder:migration:memo-contains-south-to-hold:v1";
   const SCHEMA_VERSION = 1;
+  const EXPORT_FORMAT = "property-excluder";
+  const EXPORT_VERSION = 1;
 
   const STATUS = Object.freeze({
     UNRATED: "unrated",
@@ -61,6 +64,10 @@
 
     const match = url.match(/\/chuko-ikkodate\/[^?#]*\/detail_([a-f0-9]{32})(?:\/|[?#]|$)/i);
     return match ? match[1].toLowerCase() : null;
+  }
+
+  function extractDetailPropertyId(url, canonicalUrl) {
+    return extractPropertyId(url) || extractPropertyId(canonicalUrl);
   }
 
   function isSupportedPathname(pathname) {
@@ -128,6 +135,61 @@
     return record.status === STATUS.UNRATED && record.memo === "";
   }
 
+  function isValidPropertyId(propertyId) {
+    return typeof propertyId === "string" && /^[a-f0-9]{32}$/i.test(propertyId);
+  }
+
+  function createExportData(records, settings, exportedAt = new Date().toISOString()) {
+    const sanitizedRecords = Array.isArray(records)
+      ? records
+        .map((record) => {
+          const propertyId = cleanText(record && record.propertyId, 64).toLowerCase();
+          return isValidPropertyId(propertyId) ? sanitizeRecord(record, propertyId) : null;
+        })
+        .filter((record) => record && !isEffectivelyEmpty(record))
+      : [];
+
+    return {
+      format: EXPORT_FORMAT,
+      version: EXPORT_VERSION,
+      exportedAt,
+      records: sanitizedRecords,
+      settings: sanitizeSettings(settings)
+    };
+  }
+
+  function sanitizeImportData(value) {
+    if (!value || typeof value !== "object" || Array.isArray(value)) {
+      throw new Error("バックアップファイルの形式が正しくありません");
+    }
+    if (value.format !== EXPORT_FORMAT || value.version !== EXPORT_VERSION || !Array.isArray(value.records)) {
+      throw new Error("対応していないバックアップファイルです");
+    }
+
+    const recordsById = new Map();
+    let ignored = 0;
+    value.records.forEach((source) => {
+      const propertyId = cleanText(source && source.propertyId, 64).toLowerCase();
+      if (!isValidPropertyId(propertyId)) {
+        ignored += 1;
+        return;
+      }
+
+      const record = sanitizeRecord(source, propertyId);
+      if (isEffectivelyEmpty(record)) {
+        ignored += 1;
+        return;
+      }
+      recordsById.set(propertyId, record);
+    });
+
+    return {
+      records: [...recordsById.values()],
+      settings: value.settings === undefined ? null : sanitizeSettings(value.settings),
+      ignored
+    };
+  }
+
   async function loadRecord(propertyId) {
     const key = propertyStorageKey(propertyId);
     const stored = await chrome.storage.local.get(key);
@@ -143,10 +205,14 @@
   }
 
   async function saveRecord(value) {
+    const preserveReasons = value.preserveReasons === true;
     const record = sanitizeRecord({
       ...value,
       updatedAt: new Date().toISOString()
     }, value.propertyId);
+    if (preserveReasons && Array.isArray(value.reasons)) {
+      record.reasons = [...new Set(value.reasons.filter((reason) => REJECTION_REASONS.includes(reason)))];
+    }
     const key = propertyStorageKey(record.propertyId);
 
     if (isEffectivelyEmpty(record)) {
@@ -156,6 +222,26 @@
 
     await chrome.storage.local.set({ [key]: record });
     return record;
+  }
+
+  async function migrateMemoContainingSouthToHoldOnce() {
+    const marker = await chrome.storage.local.get(MEMO_SOUTH_TO_HOLD_MIGRATION_KEY);
+    if (marker[MEMO_SOUTH_TO_HOLD_MIGRATION_KEY] === true) {
+      return { changed: 0, matched: 0, skipped: true };
+    }
+
+    const records = await loadAllRecords();
+    const matched = records.filter((record) => record.memo.includes("南"));
+    const targets = matched.filter((record) => record.status !== STATUS.HOLD);
+
+    await Promise.all(targets.map((record) => saveRecord({
+      ...record,
+      status: STATUS.HOLD,
+      preserveReasons: true
+    })));
+    await chrome.storage.local.set({ [MEMO_SOUTH_TO_HOLD_MIGRATION_KEY]: true });
+
+    return { changed: targets.length, matched: matched.length, skipped: false };
   }
 
   async function loadSettings() {
@@ -170,24 +256,62 @@
     return settings;
   }
 
+  async function exportData() {
+    const [records, settings] = await Promise.all([
+      loadAllRecords(),
+      loadSettings()
+    ]);
+    return createExportData(records, settings);
+  }
+
+  async function importData(value) {
+    const imported = sanitizeImportData(value);
+    const values = Object.fromEntries(imported.records.map((record) => [
+      propertyStorageKey(record.propertyId),
+      record
+    ]));
+
+    if (imported.settings) {
+      values[SETTINGS_KEY] = imported.settings;
+    }
+    if (Object.keys(values).length) {
+      await chrome.storage.local.set(values);
+    }
+
+    return {
+      imported: imported.records.length,
+      ignored: imported.ignored
+    };
+  }
+
   return Object.freeze({
     DEFAULT_SETTINGS,
+    EXPORT_FORMAT,
+    EXPORT_VERSION,
     MEMO_SHORTCUTS,
+    MEMO_SOUTH_TO_HOLD_MIGRATION_KEY,
     REJECTION_REASONS,
     SCHEMA_VERSION,
     SETTINGS_KEY,
     STATUS,
     STATUS_META,
     STORAGE_PREFIX,
+    createExportData,
     emptyRecord,
+    extractDetailPropertyId,
     extractPropertyId,
+    exportData,
+    importData,
+    isValidPropertyId,
     isSupportedPathname,
     isEffectivelyEmpty,
     loadAllRecords,
     loadRecord,
     loadSettings,
+    migrateMemoContainingSouthToHoldOnce,
     propertyStorageKey,
     sanitizeRecord,
+    sanitizeImportData,
     sanitizeSettings,
     saveRecord,
     saveSettings

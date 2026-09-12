@@ -10,6 +10,8 @@
 
 body {
   width: 360px;
+  max-height: 600px;
+  overflow-y: auto;
   margin: 0;
   background: #f4f8f9;
 }
@@ -66,12 +68,25 @@ h2 {
 }
 
 .count {
+  appearance: none;
+  width: 100%;
   display: grid;
   place-items: center;
   padding: 10px 5px 8px;
   border: 1px solid #d4dee2;
   border-radius: 9px;
   background: #fff;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+}
+
+.count:hover,
+.count:focus-visible,
+.count[aria-pressed="true"] {
+  border-color: #397485;
+  outline: none;
+  box-shadow: 0 0 0 2px #b9dce4;
 }
 
 .count strong {
@@ -86,6 +101,34 @@ h2 {
   font-weight: 700;
 }
 
+.list-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.list-heading h2 {
+  margin-bottom: 9px;
+}
+
+.back-button,
+.list-more {
+  border: 0;
+  background: transparent;
+  color: #315d6a;
+  cursor: pointer;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.back-button {
+  margin-bottom: 9px;
+  padding: 2px 0;
+  white-space: nowrap;
+}
+
 .count--candidate strong { color: #a47400; }
 .count--hold strong { color: #326b9e; }
 .count--rejected strong { color: #b12b35; }
@@ -97,7 +140,7 @@ h2 {
 
 .recent-item {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-columns: auto minmax(0, 1fr) auto;
   gap: 8px;
   align-items: start;
   padding: 9px 10px;
@@ -112,6 +155,75 @@ h2 {
 .recent-item:focus-visible {
   border-color: #397485;
   outline: 2px solid #b9dce4;
+}
+
+.list-more {
+  display: block;
+  width: 100%;
+  margin-top: 9px;
+  padding: 8px;
+  border: 1px solid #d4dee2;
+  border-radius: 7px;
+  background: #fff;
+}
+
+.list-more:hover,
+.list-more:focus-visible,
+.back-button:hover,
+.back-button:focus-visible {
+  color: #244c57;
+  outline: 2px solid #b9dce4;
+  outline-offset: 2px;
+}
+
+.transfer-actions {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 7px;
+}
+
+.transfer-button {
+  padding: 8px 10px;
+  border: 1px solid #b7c7cd;
+  border-radius: 7px;
+  background: #fff;
+  color: #315d6a;
+  cursor: pointer;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.transfer-button:hover,
+.transfer-button:focus-visible {
+  border-color: #397485;
+  outline: 2px solid #b9dce4;
+}
+
+.transfer-button:disabled {
+  cursor: wait;
+  opacity: 0.55;
+}
+
+.transfer-help,
+.transfer-status {
+  margin: 7px 0 0;
+  color: #78909c;
+  font-size: 10px;
+  line-height: 1.5;
+}
+
+.transfer-status {
+  color: #315d6a;
+  font-weight: 700;
+}
+
+.transfer-status:empty {
+  display: none;
+}
+
+.transfer-status[data-error="true"] {
+  color: #b12b35;
 }
 
 .badge {
