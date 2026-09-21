@@ -6,7 +6,7 @@
   const HAZARD_MAX_RETRIES = 20;
   const BUILDING_AREA_OPTION_VALUE = "150";
   const PROPERTY_LINK_SELECTOR = 'a[href*="/chuko-ikkodate/"][href*="/detail_"], a[href][data-activity-log-detail-data]';
-  const PRESET_BUTTON_LABEL = "プリセット条件";
+  const PRESET_BUTTON_LABEL = "プリセット1";
   const BULK_REJECT_BUTTON_LABEL = "130㎡未満を一括却下";
   const GEOCODE_REQUEST_EVENT = "property-excluder:geocode-request";
   const GEOCODE_RESPONSE_EVENT = "property-excluder:geocode-response";
@@ -138,15 +138,12 @@
     const buildingAge = conditionRow("築年数");
     const floorPlan = conditionRow("間取り");
     const buildingArea = conditionRow("専有面積・建物面積");
-    const landArea = conditionRow("土地面積");
 
     setSelectText(buildingAge?.querySelector("select"), "25年以内");
     setSelectText(floorPlan?.querySelector("select"), "5LDK以上");
     setSelectText(floorPlan?.querySelectorAll("select")[1], "上限なし");
     setSelectText(buildingArea?.querySelector("select"), "100平米以上");
     setSelectText(buildingArea?.querySelectorAll("select")[1], "上限なし");
-    setSelectText(landArea?.querySelector("select"), "下限なし");
-    setSelectText(landArea?.querySelectorAll("select")[1], "200平米以下");
 
     ["南向き", "駐車場2台可"].forEach((labelText) => {
       const checkbox = checkboxWithLabel(labelText);
