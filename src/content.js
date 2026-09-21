@@ -5,6 +5,9 @@
   const HAZARD_RETRY_DELAY_MS = 500;
   const HAZARD_MAX_RETRIES = 20;
   const BUILDING_AREA_OPTION_VALUE = "150";
+  const PROPERTY_LINK_SELECTOR = 'a[href*="/chuko-ikkodate/"][href*="/detail_"], a[href][data-activity-log-detail-data]';
+  const PRESET_BUTTON_LABEL = "プリセット条件";
+  const BULK_REJECT_BUTTON_LABEL = "130㎡未満を一括却下";
   const GEOCODE_REQUEST_EVENT = "property-excluder:geocode-request";
   const GEOCODE_RESPONSE_EVENT = "property-excluder:geocode-response";
   const GEOCODE_TIMEOUT_MS = 12000;
@@ -14,7 +17,7 @@
     return;
   }
 
-  installBuildingAreaOptionEnhancement();
+  installSearchConditionEnhancements();
 
   if (!core.isSupportedPathname(location.pathname)) {
     return;
@@ -79,11 +82,109 @@
     });
   }
 
-  function installBuildingAreaOptionEnhancement() {
+  function enhanceCitySelection() {
+    if (!/^\/chuko-ikkodate\/[^/]+\/?$/.test(location.pathname)) return;
+
+    document.querySelectorAll('input[placeholder*="の市区町村名を入力してください"]').forEach((input) => {
+      if (input.closest(".pe-city-select-row")) return;
+
+      // 入力欄のクリアボタンと候補リストの配置を保つ。
+      const field = input.closest(".input-wrap") || input;
+      const row = createElement("div", { className: "pe-city-select-row" });
+      const button = createElement("button", {
+        className: "pe-select-all-cities",
+        type: "button",
+        text: "全ての市区町村をチェック"
+      });
+      button.addEventListener("click", () => {
+        const unchecked = [...document.querySelectorAll('input[type="checkbox"][name="cities"]')]
+          .filter((checkbox) => !checkbox.checked);
+        unchecked.forEach((checkbox) => { checkbox.checked = true; });
+        unchecked.forEach((checkbox) => {
+          checkbox.dispatchEvent(new Event("input", { bubbles: true }));
+          checkbox.dispatchEvent(new Event("change", { bubbles: true }));
+        });
+      });
+      if (field !== input) field.parentElement.classList.add("pe-city-select-field");
+      field.before(row);
+      row.append(field, button);
+    });
+  }
+
+  function conditionRow(labelText) {
+    return [...document.querySelectorAll("tr")].find((row) => (
+      row.querySelector("th")?.textContent.replace(/\s+/g, " ").trim() === labelText
+    )) || null;
+  }
+
+  function setSelectText(select, optionText) {
+    if (!select) return false;
+    const option = [...select.options].find((candidate) => candidate.textContent.trim() === optionText);
+    if (!option || select.value === option.value) return false;
+    select.value = option.value;
+    select.dispatchEvent(new Event("input", { bubbles: true }));
+    select.dispatchEvent(new Event("change", { bubbles: true }));
+    return true;
+  }
+
+  function checkboxWithLabel(labelText) {
+    const label = [...document.querySelectorAll("label[for]")].find((candidate) => (
+      candidate.textContent.replace(/\s+/g, " ").trim() === labelText
+    ));
+    return label ? document.getElementById(label.htmlFor) : null;
+  }
+
+  function selectPresetCondition() {
+    const buildingAge = conditionRow("築年数");
+    const floorPlan = conditionRow("間取り");
+    const buildingArea = conditionRow("専有面積・建物面積");
+    const landArea = conditionRow("土地面積");
+
+    setSelectText(buildingAge?.querySelector("select"), "25年以内");
+    setSelectText(floorPlan?.querySelector("select"), "5LDK以上");
+    setSelectText(floorPlan?.querySelectorAll("select")[1], "上限なし");
+    setSelectText(buildingArea?.querySelector("select"), "100平米以上");
+    setSelectText(buildingArea?.querySelectorAll("select")[1], "上限なし");
+    setSelectText(landArea?.querySelector("select"), "下限なし");
+    setSelectText(landArea?.querySelectorAll("select")[1], "200平米以下");
+
+    ["南向き", "駐車場2台可"].forEach((labelText) => {
+      const checkbox = checkboxWithLabel(labelText);
+      if (!checkbox || checkbox.checked) return;
+      checkbox.checked = true;
+      checkbox.dispatchEvent(new Event("input", { bubbles: true }));
+      checkbox.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+  }
+
+  function enhancePresetCondition() {
+    if (!/^\/chuko-ikkodate\/[^/]+\/?$/.test(location.pathname)) return;
+
+    [...document.querySelectorAll("span")]
+      .filter((span) => span.textContent.replace(/\s+/g, " ").trim() === "条件を指定する")
+      .forEach((headingText) => {
+        const heading = headingText.closest("h3");
+        if (!heading || heading.querySelector(".pe-preset-button")) return;
+
+        const button = createElement("button", {
+          className: "pe-preset-button",
+          type: "button",
+          text: PRESET_BUTTON_LABEL
+        });
+        button.addEventListener("click", selectPresetCondition);
+        headingText.insertAdjacentElement("afterend", button);
+      });
+  }
+
+  function installSearchConditionEnhancements() {
     enhanceBuildingAreaOptions();
+    enhanceCitySelection();
+    enhancePresetCondition();
 
     const observer = new MutationObserver(() => {
       enhanceBuildingAreaOptions();
+      enhanceCitySelection();
+      enhancePresetCondition();
     });
     observer.observe(document.documentElement, { childList: true, subtree: true });
   }
@@ -641,19 +742,24 @@
     return form;
   }
 
-  async function persistRecord(value) {
+  async function persistRecord(value, options = {}) {
+    const notify = options.notify !== false;
     try {
       const saved = await core.saveRecord(value);
       if (core.isEffectivelyEmpty(saved)) state.records.delete(saved.propertyId);
       else state.records.set(saved.propertyId, saved);
       renderProperty(saved.propertyId);
-      showToast("判断を保存しました");
+      if (notify) showToast("判断を保存しました");
       return true;
     } catch (error) {
       console.error("[逆お気に入り] 保存に失敗しました", error);
-      showToast("保存できませんでした", true);
+      if (notify) showToast("保存できませんでした", true);
       return false;
     }
+  }
+
+  function listPropertyId(anchor) {
+    return core.extractListPropertyId(anchor.href, anchor.getAttribute("data-activity-log-detail-data"));
   }
 
   function findCardRoot(anchor) {
@@ -664,7 +770,7 @@
     if (!listItem) return null;
 
     const candidate = listItem.firstElementChild;
-    if (candidate?.querySelector('a[href*="/detail_"]')) {
+    if (candidate?.contains(anchor)) {
       return candidate;
     }
 
@@ -686,7 +792,8 @@
     const title = (card.querySelector("h2")?.textContent || record.title || "中古一戸建て")
       .trim()
       .replace(/\s+/g, " ");
-    const link = card.querySelector(`a[href*="detail_${propertyId}"]`);
+    const link = [...card.querySelectorAll(PROPERTY_LINK_SELECTOR)]
+      .find((anchor) => listPropertyId(anchor) === propertyId);
     const url = normalizedUrl(link?.href || record.url || location.href);
 
     if (!panel.parentElement) card.prepend(panel);
@@ -861,8 +968,8 @@
     const resultList = document.querySelector('[data-contents-id="result-bukken-list"]');
     if (!resultList) return;
 
-    resultList.querySelectorAll('a[href*="/chuko-ikkodate/"][href*="/detail_"]').forEach((anchor) => {
-      const propertyId = core.extractPropertyId(anchor.href);
+    resultList.querySelectorAll(PROPERTY_LINK_SELECTOR).forEach((anchor) => {
+      const propertyId = listPropertyId(anchor);
       const card = findCardRoot(anchor);
       if (!propertyId || !card || seenCards.has(card)) return;
       seenCards.add(card);
@@ -874,6 +981,7 @@
       }
     });
     ensureFilterControl();
+    enhanceBulkRejectControl();
     updateFilterSummary();
   }
 
@@ -920,6 +1028,86 @@
     if (count && count.textContent !== nextText) count.textContent = nextText;
   }
 
+  function cardBuildingArea(card) {
+    const label = [...card.querySelectorAll("span")].find((span) => (
+      span.textContent.replace(/\s+/g, " ").trim() === "建物面積"
+    ));
+    if (!label?.parentElement) return null;
+
+    const valueText = label.parentElement.textContent
+      .replace(label.textContent, "")
+      .replace(/,/g, " ")
+      .trim();
+    const match = valueText.match(/(\d+(?:\.\d+)?)/);
+    return match ? Number(match[1]) : null;
+  }
+
+  function cardRecordContext(card, propertyId) {
+    const record = currentRecord(propertyId);
+    const title = (card.querySelector("h2")?.textContent || record.title || "中古一戸建て")
+      .trim()
+      .replace(/\s+/g, " ");
+    const link = [...card.querySelectorAll(PROPERTY_LINK_SELECTOR)]
+      .find((anchor) => listPropertyId(anchor) === propertyId);
+    return {
+      propertyId,
+      status: core.STATUS.REJECTED,
+      reasons: [...new Set([...record.reasons, "狭さ"])],
+      memo: record.memo,
+      title,
+      url: normalizedUrl(link?.href || record.url || location.href)
+    };
+  }
+
+  async function bulkRejectSmallProperties(button) {
+    scanListPage();
+    const targets = [...document.querySelectorAll("[data-pe-card-id]")]
+      .filter((card) => {
+        const area = cardBuildingArea(card);
+        return area !== null && area < 130;
+      });
+
+    if (!targets.length) {
+      showToast("130㎡未満の物件はありません");
+      return;
+    }
+
+    button.disabled = true;
+    try {
+      const results = await Promise.all(targets.map((card) => (
+        persistRecord(cardRecordContext(card, card.dataset.peCardId), { notify: false })
+      )));
+      const savedCount = results.filter(Boolean).length;
+      showToast(`${savedCount}件を「狭さ」で却下しました`);
+    } finally {
+      button.disabled = false;
+    }
+  }
+
+  function enhanceBulkRejectControl() {
+    if (!document.querySelector('[data-contents-id="result-bukken-list"]')) return;
+
+    document.querySelectorAll('select[name="pnum"]').forEach((select) => {
+      if (select.closest(".pe-pnum-row")) return;
+      const selectContainer = select.closest(".select") || select;
+      const row = createElement("div", { className: "pe-pnum-row" });
+      const button = createElement("button", {
+        className: "pe-bulk-reject-button",
+        type: "button",
+        text: BULK_REJECT_BUTTON_LABEL
+      });
+      button.addEventListener("click", () => {
+        bulkRejectSmallProperties(button).catch((error) => {
+          console.error("[逆お気に入り] 一括却下に失敗しました", error);
+          showToast("一括却下できませんでした", true);
+          button.disabled = false;
+        });
+      });
+      selectContainer.before(row);
+      row.append(selectContainer, button);
+    });
+  }
+
   function scanPage() {
     state.scanScheduled = false;
     const propertyId = currentDetailPropertyId();
@@ -938,7 +1126,7 @@
       const anchor = event.target.closest?.("a[href]");
       const card = anchor?.closest?.("[data-pe-card-id]");
       if (!anchor || !card || anchor.closest(".pe-root")) return;
-      if (core.extractPropertyId(anchor.href) !== card.dataset.peCardId) return;
+      if (listPropertyId(anchor) !== card.dataset.peCardId) return;
 
       const record = currentRecord(card.dataset.peCardId);
       if (record.status !== core.STATUS.REJECTED) return;

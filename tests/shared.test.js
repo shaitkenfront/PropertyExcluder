@@ -21,6 +21,26 @@ test("対象外URLからは物件番号を抽出しない", () => {
   assert.equal(core.extractPropertyId(null), null);
 });
 
+test("ピタットハウス直リンクはカードのnifty物件IDで通常詳細と同一物件として扱う", () => {
+  const externalUrl = "https://www.pitat.com/buyDetail/LR400051.html?cvid=nf";
+  const propertyId = "955245b295d03327a10bef8421cd63c2";
+  const canonicalUrl = `https://myhome.nifty.com/chuko-ikkodate/oita/oitashi_ct/detail_${propertyId}/`;
+  assert.equal(core.extractPropertyId(externalUrl), null);
+  assert.equal(core.extractListPropertyId(externalUrl, `${propertyId}||buh`), propertyId);
+  assert.equal(core.extractListPropertyId(externalUrl, `${propertyId}||buh`),
+    core.extractDetailPropertyId("/chuko-ikkodate/oita/oitashi_ct/athomef_6980831065/", canonicalUrl));
+  assert.equal(core.extractListPropertyId(canonicalUrl, `${PROPERTY_ID}||buh`), propertyId);
+  assert.equal(core.extractListPropertyId(externalUrl, `${propertyId.toUpperCase()}||buh`), propertyId);
+});
+
+test("掲載元IDや不正なカード属性を物件IDとして使用しない", () => {
+  const externalUrl = "https://www.pitat.com/buyDetail/LR400051.html?cvid=nf";
+  for (const value of [undefined, null, "", `${"a".repeat(64)}||buh`, `${PROPERTY_ID}||other`, "invalid||buh"]) {
+    assert.equal(core.extractListPropertyId(externalUrl, value), null);
+  }
+  assert.equal(core.extractListPropertyId(`/chuko-ikkodate/oita/oitashi_ct/detail_${PROPERTY_ID}/`), PROPERTY_ID);
+});
+
 test("お気に入り経由のURLではcanonical URLから物件番号を抽出する", () => {
   const favoriteUrl = "https://myhome.nifty.com/chuko-ikkodate/kagawa/takamatsushi_ct/suumof_21474566/";
   const canonicalUrl = `https://myhome.nifty.com/chuko-ikkodate/kagawa/takamatsushi_ct/detail_${PROPERTY_ID}/`;
@@ -62,7 +82,9 @@ test("一言メモ用ショートカットを定義する", () => {
     "1F部屋数不足",
     "1F南向き部屋不足",
     "2Fトイレなし",
-    "ハザード情報未取得"
+    "ハザード情報未取得",
+    "2Fリビング",
+    "3階建て"
   ]);
 });
 

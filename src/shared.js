@@ -50,7 +50,9 @@
     "1F部屋数不足",
     "1F南向き部屋不足",
     "2Fトイレなし",
-    "ハザード情報未取得"
+    "ハザード情報未取得",
+    "2Fリビング",
+    "3階建て"
   ]);
 
   const DEFAULT_SETTINGS = Object.freeze({
@@ -68,6 +70,17 @@
 
   function extractDetailPropertyId(url, canonicalUrl) {
     return extractPropertyId(url) || extractPropertyId(canonicalUrl);
+  }
+
+  function extractListPropertyId(url, activityLogDetailData) {
+    const propertyId = extractPropertyId(url);
+    if (propertyId) return propertyId;
+
+    // 外部サイト直リンクのカードにもnifty側の物件IDが付いている。
+    // data-detail-id/data-detail-linkは掲載元の別IDなので使用しない。
+    if (typeof activityLogDetailData !== "string") return null;
+    const match = activityLogDetailData.match(/^([a-f0-9]{32})\|\|buh$/i);
+    return match ? match[1].toLowerCase() : null;
   }
 
   function isSupportedPathname(pathname) {
@@ -299,6 +312,7 @@
     createExportData,
     emptyRecord,
     extractDetailPropertyId,
+    extractListPropertyId,
     extractPropertyId,
     exportData,
     importData,
