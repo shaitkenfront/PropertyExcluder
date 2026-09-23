@@ -1118,30 +1118,6 @@
     window.setTimeout(scanPage, 100);
   }
 
-  function installRejectedNavigationGuard() {
-    document.addEventListener("click", (event) => {
-      const anchor = event.target.closest?.("a[href]");
-      const card = anchor?.closest?.("[data-pe-card-id]");
-      if (!anchor || !card || anchor.closest(".pe-root")) return;
-      if (listPropertyId(anchor) !== card.dataset.peCardId) return;
-
-      const record = currentRecord(card.dataset.peCardId);
-      if (record.status !== core.STATUS.REJECTED) return;
-
-      const detail = recordDescription(record);
-      const message = [
-        "この物件は却下済みです。",
-        detail ? `理由・メモ：${detail}` : "",
-        "それでも詳細を開きますか？"
-      ].filter(Boolean).join("\n\n");
-
-      if (!window.confirm(message)) {
-        event.preventDefault();
-        event.stopImmediatePropagation();
-      }
-    }, true);
-  }
-
   function installHazardPopoverGuard() {
     document.addEventListener("click", (event) => {
       if (event.target.closest?.(".pe-hazard-panel")) return;
@@ -1181,7 +1157,6 @@
 
     installGeocoderResponseListener();
     scanPage();
-    installRejectedNavigationGuard();
     installHazardPopoverGuard();
 
     const observer = new MutationObserver((mutations) => {
