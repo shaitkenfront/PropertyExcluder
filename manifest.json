@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "逆お気に入り for nifty不動産",
   "version": "0.1.0",
-  "description": "nifty不動産の中古一戸建てに、候補・保留・却下の判断と理由・メモをローカル保存します。",
+  "description": "nifty不動産の中古一戸建て・賃貸物件に、候補・保留・却下の判断と理由・メモをローカル保存します。",
   "permissions": [
     "storage"
   ],
@@ -16,7 +16,8 @@
   "content_scripts": [
     {
       "matches": [
-        "https://myhome.nifty.com/chuko-ikkodate/*"
+        "https://myhome.nifty.com/chuko-ikkodate/*",
+        "https://myhome.nifty.com/rent/*"
       ],
       "js": [
         "src/page-geocoder.js"
@@ -26,7 +27,8 @@
     },
     {
       "matches": [
-        "https://myhome.nifty.com/chuko-ikkodate/*"
+        "https://myhome.nifty.com/chuko-ikkodate/*",
+        "https://myhome.nifty.com/rent/*"
       ],
       "js": [
         "src/shared.js",

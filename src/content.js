@@ -5,7 +5,7 @@
   const HAZARD_RETRY_DELAY_MS = 500;
   const HAZARD_MAX_RETRIES = 20;
   const BUILDING_AREA_OPTION_VALUE = "150";
-  const PROPERTY_LINK_SELECTOR = 'a[href*="/chuko-ikkodate/"][href*="/detail_"], a[href][data-activity-log-detail-data]';
+  const PROPERTY_LINK_SELECTOR = 'a[href*="/chuko-ikkodate/"][href*="/detail_"], a[href*="/rent/"][href*="/detail_"], a[href][data-activity-log-detail-data]';
   const PRESET_BUTTON_LABEL = "プリセット1";
   const BULK_REJECT_BUTTON_LABEL = "130㎡未満を一括却下";
   const GEOCODE_REQUEST_EVENT = "property-excluder:geocode-request";
@@ -174,6 +174,8 @@
   }
 
   function installSearchConditionEnhancements() {
+    if (!location.pathname.startsWith("/chuko-ikkodate/")) return;
+
     enhanceBuildingAreaOptions();
     enhanceCitySelection();
     enhancePresetCondition();
@@ -359,10 +361,10 @@
   }
 
   function ensureHazardPanel() {
-    const addressRow = findAddressRow();
-    if (!addressRow) return null;
+    const insertionPoint = findAddressRow() || findMapElement();
+    if (!insertionPoint) return null;
 
-    const parent = addressRow.parentElement;
+    const parent = insertionPoint.parentElement;
     const existing = parent?.querySelector(":scope > .pe-hazard-panel");
     if (existing) return existing;
 
@@ -394,7 +396,7 @@
     });
 
     panel.append(button, popover);
-    addressRow.insertAdjacentElement("afterend", panel);
+    insertionPoint.insertAdjacentElement("afterend", panel);
     return panel;
   }
 
@@ -777,7 +779,7 @@
     const panel = card.querySelector(":scope > .pe-card-panel") || createElement("div", {
       className: "pe-root pe-card-panel"
     });
-    const title = (card.querySelector("h2")?.textContent || record.title || "中古一戸建て")
+    const title = (card.querySelector("h2")?.textContent || record.title || "物件")
       .trim()
       .replace(/\s+/g, " ");
     const link = [...card.querySelectorAll(PROPERTY_LINK_SELECTOR)]
@@ -867,7 +869,7 @@
 
   function renderDetail(panel, propertyId) {
     const record = currentRecord(propertyId);
-    const title = (document.querySelector("h1")?.textContent || record.title || "中古一戸建て")
+    const title = (document.querySelector("h1")?.textContent || record.title || "物件")
       .trim()
       .replace(/\s+/g, " ");
     const url = normalizedUrl(location.href);
@@ -1073,6 +1075,7 @@
   }
 
   function enhanceBulkRejectControl() {
+    if (!location.pathname.startsWith("/chuko-ikkodate/")) return;
     if (!document.querySelector('[data-contents-id="result-bukken-list"]')) return;
 
     document.querySelectorAll('select[name="pnum"]').forEach((select) => {

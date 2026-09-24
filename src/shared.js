@@ -64,7 +64,7 @@
       return null;
     }
 
-    const match = url.match(/\/chuko-ikkodate\/[^?#]*\/detail_([a-f0-9]{32})(?:\/|[?#]|$)/i);
+    const match = url.match(/\/(?:chuko-ikkodate|rent)\/[^?#]*\/detail_([a-f0-9]{32})(?:\/|[?#]|$)/i);
     return match ? match[1].toLowerCase() : null;
   }
 
@@ -88,7 +88,8 @@
       return false;
     }
 
-    return /^\/chuko-ikkodate\/[^/]+\/[^/]+(?:\/|$)/.test(pathname);
+    return /^\/chuko-ikkodate\/[^/]+\/[^/]+(?:\/|$)/.test(pathname)
+      || /^\/rent(?:\/|$)/.test(pathname);
   }
 
   function propertyStorageKey(propertyId) {
@@ -244,7 +245,9 @@
     }
 
     const records = await loadAllRecords();
-    const matched = records.filter((record) => record.memo.includes("南"));
+    const matched = records.filter((record) => (
+      !record.url.includes("/rent/") && record.memo.includes("南")
+    ));
     const targets = matched.filter((record) => record.status !== STATUS.HOLD);
 
     await Promise.all(targets.map((record) => saveRecord({
