@@ -264,18 +264,9 @@
 
     panel.dataset.status = state.geocode.status;
     if (state.geocode.status === "loaded") {
-      const coordinates = findMapCoordinates();
-      if (!coordinates) {
-        value.textContent = state.geocode.address;
-        return true;
-      }
-
       const mapsUrl = new URL("https://www.google.com/maps/search/");
       mapsUrl.searchParams.set("api", "1");
-      mapsUrl.searchParams.set(
-        "query",
-        `${coordinates.latitude},${coordinates.longitude}`
-      );
+      mapsUrl.searchParams.set("query", state.geocode.address);
       value.replaceChildren(createElement("a", {
         className: "pe-geocoded-address-link",
         text: state.geocode.address,

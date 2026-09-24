@@ -98,15 +98,16 @@
       ));
     } else {
       visible.forEach((record) => {
-        const item = createElement(record.url ? "a" : "div", "recent-item");
+        const item = createElement("article", "recent-item");
+        const link = createElement(record.url ? "a" : "div", "recent-link");
         if (record.url) {
-          item.href = record.url;
-          item.target = "_blank";
-          item.rel = "noreferrer";
+          link.href = record.url;
+          link.target = "_blank";
+          link.rel = "noreferrer";
         }
 
         const meta = core.STATUS_META[record.status];
-        item.append(createElement(
+        link.append(createElement(
           "span",
           `badge badge--${record.status}`,
           meta.label
@@ -117,12 +118,55 @@
           createElement("p", "recent-title", record.title || `物件 ${record.propertyId.slice(0, 8)}`),
           createElement("p", "recent-note", displayNote(record))
         );
-        item.append(text);
+        link.append(text);
 
         const date = formatUpdatedAt(record.updatedAt);
         if (date) {
-          item.append(createElement("time", "recent-date", date));
+          link.append(createElement("time", "recent-date", date));
         }
+
+        const actions = createElement("div", "recent-actions");
+        const menuButton = createElement("button", "recent-menu-toggle", "…");
+        menuButton.type = "button";
+        menuButton.setAttribute("aria-label", `${record.title || "物件"}のメニュー`);
+        menuButton.setAttribute("aria-haspopup", "true");
+        menuButton.setAttribute("aria-expanded", "false");
+        const menu = createElement("div", "recent-menu");
+        menu.hidden = true;
+        menu.setAttribute("role", "menu");
+        const rejectButton = createElement("button", "recent-menu-item", "却下する");
+        rejectButton.type = "button";
+        rejectButton.setAttribute("role", "menuitem");
+        rejectButton.disabled = record.status === core.STATUS.REJECTED;
+        if (rejectButton.disabled) rejectButton.textContent = "却下済み";
+        rejectButton.addEventListener("click", async () => {
+          rejectButton.disabled = true;
+          try {
+            await core.saveRecord({
+              ...record,
+              status: core.STATUS.REJECTED,
+              reasons: record.reasons
+            });
+            await render();
+          } catch (error) {
+            console.error("[逆お気に入り] 物件を却下できませんでした", error);
+            rejectButton.textContent = "却下できませんでした";
+            rejectButton.disabled = false;
+          }
+        });
+        menu.append(rejectButton);
+        menuButton.addEventListener("click", () => {
+          const open = menu.hidden;
+          document.querySelectorAll(".recent-menu").forEach((otherMenu) => {
+            otherMenu.hidden = true;
+            otherMenu.parentElement?.querySelector(".recent-menu-toggle")?.setAttribute("aria-expanded", "false");
+          });
+          menu.hidden = !open;
+          menuButton.setAttribute("aria-expanded", String(open));
+          if (open) rejectButton.focus();
+        });
+        actions.append(menuButton, menu);
+        item.append(link, actions);
         list.append(item);
       });
     }
@@ -130,6 +174,24 @@
     listMore.hidden = visible.length >= sorted.length;
     listMore.textContent = `さらに表示（残り${Math.max(0, sorted.length - visible.length)}件）`;
   }
+
+  document.addEventListener("click", (event) => {
+    if (event.target.closest(".recent-actions")) return;
+    document.querySelectorAll(".recent-menu").forEach((menu) => {
+      menu.hidden = true;
+      menu.parentElement?.querySelector(".recent-menu-toggle")?.setAttribute("aria-expanded", "false");
+    });
+  });
+
+  document.addEventListener("keydown", (event) => {
+    if (event.key !== "Escape") return;
+    document.querySelectorAll(".recent-menu:not([hidden])").forEach((menu) => {
+      menu.hidden = true;
+      const toggle = menu.parentElement?.querySelector(".recent-menu-toggle");
+      toggle?.setAttribute("aria-expanded", "false");
+      toggle?.focus();
+    });
+  });
 
   async function render() {
     await core.migrateMemoContainingSouthToHoldOnce();
