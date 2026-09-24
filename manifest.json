@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "逆お気に入り for nifty不動産",
+  "name": "逆お気に入り for 不動産サイト",
   "version": "0.1.0",
-  "description": "nifty不動産の中古一戸建て・賃貸物件に、候補・保留・却下の判断と理由・メモをローカル保存します。",
+  "description": "不動産サイトの物件に、候補・保留・却下の判断と理由・メモをローカル保存します。",
   "permissions": [
     "storage"
   ],
@@ -28,7 +28,9 @@
     {
       "matches": [
         "https://myhome.nifty.com/chuko-ikkodate/*",
-        "https://myhome.nifty.com/rent/*"
+        "https://myhome.nifty.com/rent/*",
+        "https://www.hatomarksite.com/search/zentaku/buy/house/*",
+        "https://www.hatomarksite.com/search/zentaku/bukken/*"
       ],
       "js": [
         "src/shared.js",

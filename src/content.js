@@ -5,7 +5,7 @@
   const HAZARD_RETRY_DELAY_MS = 500;
   const HAZARD_MAX_RETRIES = 20;
   const BUILDING_AREA_OPTION_VALUE = "150";
-  const PROPERTY_LINK_SELECTOR = 'a[href*="/chuko-ikkodate/"][href*="/detail_"], a[href*="/rent/"][href*="/detail_"], a[href][data-activity-log-detail-data]';
+  const PROPERTY_LINK_SELECTOR = 'a[href*="/chuko-ikkodate/"][href*="/detail_"], a[href*="/rent/"][href*="/detail_"], a[href*="/search/zentaku/bukken/"], a[href][data-activity-log-detail-data]';
   const PRESET_BUTTON_LABEL = "プリセット1";
   const BULK_REJECT_BUTTON_LABEL = "130㎡未満を一括却下";
   const GEOCODE_REQUEST_EVENT = "property-excluder:geocode-request";
@@ -174,6 +174,12 @@
   }
 
   function installSearchConditionEnhancements() {
+    if (location.hostname === "www.hatomarksite.com") {
+      enhanceHatomarkPreset();
+      const observer = new MutationObserver(enhanceHatomarkPreset);
+      observer.observe(document.documentElement, { childList: true, subtree: true });
+      return;
+    }
     if (!location.pathname.startsWith("/chuko-ikkodate/")) return;
 
     enhanceBuildingAreaOptions();
@@ -186,6 +192,47 @@
       enhancePresetCondition();
     });
     observer.observe(document.documentElement, { childList: true, subtree: true });
+  }
+
+  function enhanceHatomarkPreset() {
+    if (!/^\/search\/zentaku\/buy\/house\/area(?:\/|$)/.test(location.pathname)) return;
+    const conditionPanel = document.querySelector(".search-bar-list-content");
+    if (!conditionPanel || conditionPanel.querySelector(".pe-preset-button")) return;
+
+    const button = createElement("button", {
+      className: "pe-preset-button",
+      type: "button",
+      text: PRESET_BUTTON_LABEL
+    });
+    button.addEventListener("click", selectHatomarkPreset);
+    conditionPanel.prepend(button);
+  }
+
+  function selectHatomarkPreset() {
+    const setSelectValue = (name, value) => {
+      const select = document.querySelector(`select[name="${name}"]`);
+      if (!select || select.value === value) return;
+      select.value = value;
+      select.dispatchEvent(new Event("input", { bubbles: true }));
+      select.dispatchEvent(new Event("change", { bubbles: true }));
+    };
+    const setCheckbox = (name, value) => {
+      const group = [...document.querySelectorAll(`input[type="checkbox"][name="${name}"]`)];
+      group.forEach((checkbox) => {
+        const checked = checkbox.value === value;
+        if (checkbox.checked === checked) return;
+        checkbox.checked = checked;
+        checkbox.dispatchEvent(new Event("input", { bubbles: true }));
+        checkbox.dispatchEvent(new Event("change", { bubbles: true }));
+      });
+    };
+
+    setSelectValue("bld_area_from", "150");
+    setSelectValue("bld_area_unit", "UNIT30");
+    setCheckbox("floor_plan[]", "5XXSLDK");
+    setCheckbox("newuse[]", "used");
+    setCheckbox("pkff[]", "PKFF01");
+    setCheckbox("tolt[]", "TOLT03");
   }
 
   function currentRecord(propertyId) {
@@ -216,7 +263,22 @@
 
   function findMapCoordinates() {
     const map = findMapElement();
-    if (!map) return null;
+    if (!map) {
+      const mapLink = [...document.querySelectorAll('a[href*="maps.google"]')]
+        .find((anchor) => /地図を見る|MAP/.test(anchor.textContent));
+      if (!mapLink) return null;
+      try {
+        const query = new URL(mapLink.href).searchParams.get("q") || "";
+        const coordinates = query.match(/(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)/);
+        if (!coordinates) return null;
+        const latitude = Number(coordinates[1]);
+        const longitude = Number(coordinates[2]);
+        if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return null;
+        return { latitude, longitude, key: `${latitude},${longitude}` };
+      } catch (_error) {
+        return null;
+      }
+    }
 
     const latitude = Number(map.getAttribute("data-latitude"));
     const longitude = Number(map.getAttribute("data-longitude"));
@@ -357,7 +419,9 @@
       const href = use.getAttribute("href") || use.getAttribute("xlink:href") || "";
       return href.includes("#map-marker");
     });
-    return marker?.closest(".box.is-flex") || null;
+    if (marker) return marker.closest(".box.is-flex") || null;
+    const mapLink = document.querySelector('main .prop-detail a[href*="maps.google.co.jp/maps?q="]');
+    return mapLink?.closest(".row.g-0") || null;
   }
 
   function ensureHazardPanel() {
@@ -753,6 +817,8 @@
   }
 
   function findCardRoot(anchor) {
+    const hatomarkCard = anchor.closest(".search-result-box");
+    if (hatomarkCard) return hatomarkCard;
     const preferred = anchor.closest(".card.is-bg-light.is-floating-shadow");
     if (preferred) return preferred;
 
@@ -869,7 +935,12 @@
 
   function renderDetail(panel, propertyId) {
     const record = currentRecord(propertyId);
-    const title = (document.querySelector("h1")?.textContent || record.title || "物件")
+    const hatomarkTitle = location.hostname === "www.hatomarksite.com"
+      ? document.querySelector("main .detail-content .container-xl")?.innerText
+        .split("\n").map((part) => part.trim())
+        .find((part) => part && !/^(売買|中古一戸建|電話問合せ|お問合せ)/.test(part))
+      : "";
+    const title = (document.querySelector("h1")?.textContent || hatomarkTitle || record.title || "物件")
       .trim()
       .replace(/\s+/g, " ");
     const url = normalizedUrl(location.href);
@@ -934,12 +1005,19 @@
 
     const summary = document.querySelector("#summary");
     const heading = summary?.querySelector("h1") || document.querySelector("main h1");
-    if (!heading) return;
+    const hatomarkDetails = location.hostname === "www.hatomarksite.com"
+      ? document.querySelector("main .detail-content .container-xl")
+      : null;
+    if (!heading && !hatomarkDetails) return;
 
     const panel = createElement("section", { className: "pe-root pe-detail-panel" });
     panel.dataset.peDetailId = propertyId;
 
-    if (summary && summary.contains(heading)) {
+    if (hatomarkDetails) {
+      const detailTable = hatomarkDetails.querySelector(".prop-detail");
+      if (detailTable) detailTable.before(panel);
+      else hatomarkDetails.prepend(panel);
+    } else if (summary && summary.contains(heading)) {
       let headingBlock = heading;
       while (headingBlock.parentElement && headingBlock.parentElement !== summary) {
         headingBlock = headingBlock.parentElement;
@@ -955,10 +1033,16 @@
 
   function scanListPage() {
     const seenCards = new Set();
-    const resultList = document.querySelector('[data-contents-id="result-bukken-list"]');
+    const isHatomark = location.hostname === "www.hatomarksite.com";
+    const resultList = isHatomark
+      ? document.querySelector(".search-bar-list-content")
+      : document.querySelector('[data-contents-id="result-bukken-list"]');
     if (!resultList) return;
 
-    resultList.querySelectorAll(PROPERTY_LINK_SELECTOR).forEach((anchor) => {
+    const anchors = isHatomark
+      ? document.querySelectorAll(`.search-result-box ${PROPERTY_LINK_SELECTOR}`)
+      : resultList.querySelectorAll(PROPERTY_LINK_SELECTOR);
+    anchors.forEach((anchor) => {
       const propertyId = listPropertyId(anchor);
       const card = findCardRoot(anchor);
       if (!propertyId || !card || seenCards.has(card)) return;

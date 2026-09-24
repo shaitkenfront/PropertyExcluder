@@ -65,7 +65,10 @@
     }
 
     const match = url.match(/\/(?:chuko-ikkodate|rent)\/[^?#]*\/detail_([a-f0-9]{32})(?:\/|[?#]|$)/i);
-    return match ? match[1].toLowerCase() : null;
+    if (match) return match[1].toLowerCase();
+
+    const hatomarkMatch = url.match(/\/search\/zentaku\/bukken\/([0-9]+)(?:[/?#]|$)/i);
+    return hatomarkMatch ? `hatomark-${hatomarkMatch[1]}` : null;
   }
 
   function extractDetailPropertyId(url, canonicalUrl) {
@@ -89,7 +92,8 @@
     }
 
     return /^\/chuko-ikkodate\/[^/]+\/[^/]+(?:\/|$)/.test(pathname)
-      || /^\/rent(?:\/|$)/.test(pathname);
+      || /^\/rent(?:\/|$)/.test(pathname)
+      || /^\/search\/zentaku\/(?:buy\/house(?:\/|$)|bukken\/[0-9]+(?:\/|$))/.test(pathname);
   }
 
   function propertyStorageKey(propertyId) {
@@ -150,7 +154,8 @@
   }
 
   function isValidPropertyId(propertyId) {
-    return typeof propertyId === "string" && /^[a-f0-9]{32}$/i.test(propertyId);
+    return typeof propertyId === "string"
+      && (/^[a-f0-9]{32}$/i.test(propertyId) || /^hatomark-[0-9]{1,20}$/i.test(propertyId));
   }
 
   function createExportData(records, settings, exportedAt = new Date().toISOString()) {
@@ -246,7 +251,9 @@
 
     const records = await loadAllRecords();
     const matched = records.filter((record) => (
-      !record.url.includes("/rent/") && record.memo.includes("南")
+      !record.url.includes("/rent/")
+      && !record.url.includes("/search/zentaku/")
+      && record.memo.includes("南")
     ));
     const targets = matched.filter((record) => record.status !== STATUS.HOLD);
 
