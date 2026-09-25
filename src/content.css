@@ -9,6 +9,12 @@
   gap: 8px;
 }
 
+.pe-rent-city-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 8px;
+}
+
 .pe-city-select-row > .input-wrap,
 .pe-city-select-row > input {
   flex: 1 1 auto;

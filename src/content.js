@@ -5,9 +5,9 @@
   const HAZARD_RETRY_DELAY_MS = 500;
   const HAZARD_MAX_RETRIES = 20;
   const BUILDING_AREA_OPTION_VALUE = "150";
-  const PROPERTY_LINK_SELECTOR = 'a[href*="/chuko-ikkodate/"][href*="/detail_"], a[href*="/rent/"][href*="/detail_"], a[href*="/search/zentaku/bukken/"], a[href][data-activity-log-detail-data]';
+  const PROPERTY_LINK_SELECTOR = 'a[href*="/chuko-ikkodate/"][href*="/detail_"], a[href*="/rent/"][href*="/detail_"], a[href*="/search/zentaku/bukken/"], a[href*="pitat.com/rentDetail/"], a[href][data-activity-log-detail-data]';
   const PRESET_BUTTON_LABEL = "プリセット1";
-  const BULK_REJECT_BUTTON_LABEL = "130㎡未満を一括却下";
+  const BULK_REJECT_BUTTON_LABEL = "130㎡以下を一括却下";
   const GEOCODE_REQUEST_EVENT = "property-excluder:geocode-request";
   const GEOCODE_RESPONSE_EVENT = "property-excluder:geocode-response";
   const GEOCODE_TIMEOUT_MS = 12000;
@@ -135,6 +135,11 @@
   }
 
   function selectPresetCondition() {
+    if (location.pathname.startsWith("/rent/")) {
+      selectRentPresetCondition();
+      return;
+    }
+
     const buildingAge = conditionRow("築年数");
     const floorPlan = conditionRow("間取り");
     const buildingArea = conditionRow("専有面積・建物面積");
@@ -154,8 +159,37 @@
     });
   }
 
+  function selectRentPresetCondition() {
+    const setSelectValue = (name, value) => {
+      document.querySelectorAll(`select[name="${name}"]`).forEach((select) => {
+        if (select.value === value) return;
+        select.value = value;
+        select.dispatchEvent(new Event("input", { bubbles: true }));
+        select.dispatchEvent(new Event("change", { bubbles: true }));
+      });
+    };
+    const setCheckboxGroup = (name, value) => {
+      document.querySelectorAll(`input[type="checkbox"][name="${name}"]`).forEach((checkbox) => {
+        const checked = checkbox.value === value;
+        if (checkbox.checked === checked) return;
+        checkbox.checked = checked;
+        checkbox.dispatchEvent(new Event("input", { bubbles: true }));
+        checkbox.dispatchEvent(new Event("change", { bubbles: true }));
+      });
+    };
+
+    setSelectValue("r12", "");
+    setSelectValue("r10", "100");
+    setSelectValue("r11", "");
+    setCheckboxGroup("r3", "54");
+    setCheckboxGroup("r20", "3");
+    setCheckboxGroup("ex25", "1");
+    setCheckboxGroup("ex5", "1");
+  }
+
   function enhancePresetCondition() {
-    if (!/^\/chuko-ikkodate\/[^/]+\/?$/.test(location.pathname)) return;
+    if (!/^\/chuko-ikkodate\/[^/]+\/?$/.test(location.pathname)
+      && !location.pathname.startsWith("/rent/")) return;
 
     [...document.querySelectorAll("span")]
       .filter((span) => span.textContent.replace(/\s+/g, " ").trim() === "条件を指定する")
@@ -180,6 +214,16 @@
       observer.observe(document.documentElement, { childList: true, subtree: true });
       return;
     }
+    if (location.pathname.startsWith("/rent/")) {
+      enhanceRentCitySelection();
+      enhancePresetCondition();
+      const observer = new MutationObserver(() => {
+        enhanceRentCitySelection();
+        enhancePresetCondition();
+      });
+      observer.observe(document.documentElement, { childList: true, subtree: true });
+      return;
+    }
     if (!location.pathname.startsWith("/chuko-ikkodate/")) return;
 
     enhanceBuildingAreaOptions();
@@ -192,6 +236,33 @@
       enhancePresetCondition();
     });
     observer.observe(document.documentElement, { childList: true, subtree: true });
+  }
+
+  function enhanceRentCitySelection() {
+    if (!location.pathname.startsWith("/rent/")) return;
+    document.querySelectorAll('[data-contents-id="search-condition-city"]').forEach((panel) => {
+      if (panel.querySelector(".pe-rent-city-actions")) return;
+      const firstGroup = panel.querySelector(":scope > .box.is-space-xs") || panel.firstElementChild;
+      if (!firstGroup) return;
+
+      const actions = createElement("div", { className: "pe-rent-city-actions" });
+      const button = createElement("button", {
+        className: "pe-select-all-cities",
+        type: "button",
+        text: "全ての市区町村を選択"
+      });
+      button.addEventListener("click", () => {
+        const unchecked = [...document.querySelectorAll('input[type="checkbox"][name="cities"]')]
+          .filter((checkbox) => !checkbox.checked);
+        unchecked.forEach((checkbox) => { checkbox.checked = true; });
+        unchecked.forEach((checkbox) => {
+          checkbox.dispatchEvent(new Event("input", { bubbles: true }));
+          checkbox.dispatchEvent(new Event("change", { bubbles: true }));
+        });
+      });
+      actions.append(button);
+      firstGroup.before(actions);
+    });
   }
 
   function enhanceHatomarkPreset() {
@@ -813,7 +884,24 @@
   }
 
   function listPropertyId(anchor) {
-    return core.extractListPropertyId(anchor.href, anchor.getAttribute("data-activity-log-detail-data"));
+    const propertyId = core.extractListPropertyId(anchor.href, anchor.getAttribute("data-activity-log-detail-data"));
+    if (propertyId) return propertyId;
+
+    // 賃貸のピタットハウス専用カードはニフティ物件詳細へのリンクを持たないため、
+    // カードの「他の部屋」URLに含まれるニフティ側の物件IDを使う。
+    if (!location.pathname.startsWith("/rent/")
+      || !anchor.matches('a[href*="pitat.com/rentDetail/"]')) return null;
+    const otherRoomPath = anchor.closest("li.result-bukken-list")
+      ?.querySelector(".card[data-show-other-room]")
+      ?.getAttribute("data-show-other-room");
+    if (!otherRoomPath) return null;
+
+    try {
+      const id = new URL(otherRoomPath, location.origin).searchParams.get("exclude");
+      return /^[a-f0-9]{32}$/i.test(id || "") ? id.toLowerCase() : null;
+    } catch (_error) {
+      return null;
+    }
   }
 
   function findCardRoot(anchor) {
@@ -1106,19 +1194,30 @@
     const label = [...card.querySelectorAll("span")].find((span) => (
       span.textContent.replace(/\s+/g, " ").trim() === "建物面積"
     ));
-    if (!label?.parentElement) return null;
+    if (label?.parentElement) {
+      const valueText = label.parentElement.textContent
+        .replace(label.textContent, "")
+        .replace(/,/g, " ")
+        .trim();
+      const match = valueText.match(/(\d+(?:\.\d+)?)/);
+      if (match) return Number(match[1]);
+    }
 
-    const valueText = label.parentElement.textContent
-      .replace(label.textContent, "")
-      .replace(/,/g, " ")
-      .trim();
-    const match = valueText.match(/(\d+(?:\.\d+)?)/);
-    return match ? Number(match[1]) : null;
+    if (location.pathname.startsWith("/rent/")) {
+      const areas = [...card.querySelectorAll("td")]
+        .flatMap((cell) => [...cell.textContent.matchAll(/([\d,]+(?:\.\d+)?)\s*(?:㎡|m²|平米)/gi)])
+        .map((match) => Number(match[1].replace(/,/g, "")))
+        .filter(Number.isFinite);
+      return areas.length ? Math.min(...areas) : null;
+    }
+
+    return null;
   }
 
   function cardRecordContext(card, propertyId) {
     const record = currentRecord(propertyId);
-    const title = (card.querySelector("h2")?.textContent || record.title || "中古一戸建て")
+    const defaultTitle = location.pathname.startsWith("/rent/") ? "賃貸物件" : "中古一戸建て";
+    const title = (card.querySelector("h2, h3, h4")?.textContent || record.title || defaultTitle)
       .trim()
       .replace(/\s+/g, " ");
     const link = [...card.querySelectorAll(PROPERTY_LINK_SELECTOR)]
@@ -1138,11 +1237,11 @@
     const targets = [...document.querySelectorAll("[data-pe-card-id]")]
       .filter((card) => {
         const area = cardBuildingArea(card);
-        return area !== null && area < 130;
+        return area !== null && area <= 130;
       });
 
     if (!targets.length) {
-      showToast("130㎡未満の物件はありません");
+      showToast("130㎡以下の物件はありません");
       return;
     }
 
@@ -1159,6 +1258,28 @@
   }
 
   function enhanceBulkRejectControl() {
+    if (location.pathname.startsWith("/rent/")) {
+      if (!document.querySelector("[data-pe-card-id]")) return;
+      const control = document.querySelector('select[name="sort"]')
+        ?.closest(".box.is-flex.is-middle.is-space-column-xxs");
+      if (!control || control.querySelector(".pe-bulk-reject-button")) return;
+
+      const button = createElement("button", {
+        className: "pe-bulk-reject-button",
+        type: "button",
+        text: BULK_REJECT_BUTTON_LABEL
+      });
+      button.addEventListener("click", () => {
+        bulkRejectSmallProperties(button).catch((error) => {
+          console.error("[逆お気に入り] 一括却下に失敗しました", error);
+          showToast("一括却下できませんでした", true);
+          button.disabled = false;
+        });
+      });
+      control.append(button);
+      return;
+    }
+
     if (!location.pathname.startsWith("/chuko-ikkodate/")) return;
     if (!document.querySelector('[data-contents-id="result-bukken-list"]')) return;
 
